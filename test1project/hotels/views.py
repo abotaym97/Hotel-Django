@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
-
+from django.db.models import ProtectedError
 
 
 @api_view(['GET'])
@@ -36,7 +36,7 @@ def get_rooms(request):
 
 
 @api_view(['GET' , 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def bookings(request):
     if request.method == 'GET':
         bookings = Booking.objects.filter(user=request.user)
@@ -106,18 +106,6 @@ def booking_detail(request, id):
         return Response({"message": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
     
 
-@api_view(['POST'])
-def register(request):
-    serializer = RegisterSerializer(data=request.data)
-
-    if serializer.is_valid():
-        serializer.save()
-        return Response(
-            {"message": "User registered successfully"},
-            status=status.HTTP_201_CREATED
-        )
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -156,29 +144,43 @@ def rooms_by_hotel(request, hotel_id):
 
 
 # للتسجيل
+# @api_view(['POST'])
+# @permission_classes([AllowAny])
+# def register(request):
+
+#     username = request.data.get('username')
+#     email = request.data.get('email')
+#     password = request.data.get('password')
+
+#     if User.objects.filter(username=username).exists():
+#         return Response(
+#             {"error": "Username already exists"},
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+
+#     user = User.objects.create_user(
+#         username=username,
+#         email=email,
+#         password=password
+#     )
+
+#     return Response(
+#         {"message": "User created successfully"},
+#         status=status.HTTP_201_CREATED
+#     )
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def register(request):
+    serializer = RegisterSerializer(data=request.data)
 
-    username = request.data.get('username')
-    email = request.data.get('email')
-    password = request.data.get('password')
-
-    if User.objects.filter(username=username).exists():
+    if serializer.is_valid():
+        serializer.save()
         return Response(
-            {"error": "Username already exists"},
-            status=status.HTTP_400_BAD_REQUEST
+            serializer.data,
+            status=status.HTTP_201_CREATED
         )
 
-    user = User.objects.create_user(
-        username=username,
-        email=email,
-        password=password
-    )
-
-    return Response(
-        {"message": "User created successfully"},
-        status=status.HTTP_201_CREATED
-    )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -350,12 +352,25 @@ def room_types(request):
 
 # لإدارة أنواع الغرف (CRUD) - حذف نوع غرفة
 @api_view(['DELETE'])
+@permission_classes([AllowAny])
 def room_type_detail(request, pk):
-
     try:
         room_type = RoomType.objects.get(id=pk)
     except RoomType.DoesNotExist:
-        return Response(status=404)
+        return Response({"error": "Room type not found"}, status=404)
+
+    if room_type.rooms.exists():
+        return Response(
+            {"error": "Cannot delete this room type because it has rooms."},
+            status=400
+        )
 
     room_type.delete()
     return Response(status=204)
+    # try:
+    #     room_type.delete()
+    # except ProtectedError:
+    #     return Response(
+    #     {"error": "Cannot delete this room type because it has rooms."},
+    #     status=400
+    # )

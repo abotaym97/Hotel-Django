@@ -3,6 +3,8 @@ from .models import Hotel , Room , Booking , BookingSettings, RoomType
 from django.contrib.auth.models import User
 from .models import BookingSettings
 from datetime import timedelta
+from django.contrib.auth.models import User
+from .models import CustomerProfile
 
 
 class HotelSerializer(serializers.ModelSerializer):
@@ -51,7 +53,11 @@ class BookingSerializer(serializers.ModelSerializer):
             'room_type_display',
             'check_in',
             'check_out',
-            'user'
+            'user',
+            'guest_name',
+            'guest_email',
+            'guest_phone',
+            'guest_country',
         ]
         read_only_fields = ['user']
 
@@ -94,13 +100,19 @@ class BookingSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     f"Maximum stay is {settings.max_nights} nights"
                 )
+        booked_rooms = Booking.objects.filter(
+            room__room_type__name__iexact=room_type,
+            check_in__lt=check_out,
+            check_out__gt=check_in
+        ).values_list('room_id', flat=True)
 
         available_room = Room.objects.filter(
-            room_type=room_type,
-            is_available=True
+            room_type__name__iexact=room_type,
+            is_available=True,
+            available_from__lte=check_in,
+            available_to__gte=check_out
         ).exclude(
-            booking__check_in__lt=check_out,
-            booking__check_out__gt=check_in
+            id__in=booked_rooms
         ).first()
 
         if not available_room:
@@ -113,11 +125,10 @@ class BookingSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        request = self.context.get('request')
-        user = request.user
+        
         validated_data.pop('user', None)
         validated_data.pop('room_type', None)
-        return Booking.objects.create(user=user, **validated_data)
+        return Booking.objects.create(**validated_data)
 
     # def validate(self, data):
     #     room = data['room']
@@ -137,18 +148,32 @@ class BookingSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+    phone = serializers.CharField(write_only=True)
+    country = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'password']
+        fields = ['username', 'email', 'password', 'phone', 'country']
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
 
     def create(self, validated_data):
+        phone = validated_data.pop('phone')
+        country = validated_data.pop('country')
+
         user = User.objects.create_user(
             username=validated_data['username'],
-            email=validated_data.get('email', ''),
+            email=validated_data['email'],
             password=validated_data['password']
         )
+
+        CustomerProfile.objects.create(
+            user=user,
+            phone=phone,
+            country=country
+        )
+
         return user
     
 
