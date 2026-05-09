@@ -11,6 +11,17 @@ class Hotel(models.Model):
     def __str__(self):
         return self.name
     
+
+
+
+
+class RoomType(models.Model):
+    name = models.CharField(max_length=100)
+    image = models.ImageField(upload_to='room_types/')
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
 #Room
 class Room(models.Model):
 
@@ -25,7 +36,8 @@ class Room(models.Model):
 
     hotel = models.ForeignKey(Hotel,on_delete=models.CASCADE)
     room_number = models.IntegerField()
-    room_type = models.CharField(max_length=50, choices=ROOM_TYPES , default='deluxe king')
+    room_type = models.ForeignKey(RoomType,on_delete=models.CASCADE,related_name="rooms")
+    # room_type = models.CharField(max_length=50, choices=ROOM_TYPES , default='deluxe king')
     Price = models.DecimalField(max_digits=8,decimal_places=2)
     capacity = models.IntegerField(default=1)
     is_available = models.BooleanField(default=True)
@@ -72,3 +84,6 @@ class BookingSettings(models.Model):
 
     def __str__(self):
         return "Booking Settings"
+    
+
+

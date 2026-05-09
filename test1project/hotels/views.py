@@ -2,8 +2,8 @@ from rest_framework.decorators import api_view , permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated , IsAdminUser , AllowAny
 from rest_framework import status
-from .serializers import RegisterSerializer , UserSerializer
-from .models import Hotel , Room , Booking , BookingSettings
+from .serializers import RegisterSerializer, RoomTypeSerializer , UserSerializer
+from .models import Hotel , Room , Booking , BookingSettings, RoomType
 from .serializers import HotelSerializer , RoomSerializer , BookingSerializer , BookingSettingsSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
@@ -64,6 +64,7 @@ def available_rooms(request):
         rooms = rooms.filter(room_type=room_type)
 
     booked_rooms = Booking.objects.filter(
+        room__room_type=room_type,
         check_in__lt=check_out,
         check_out__gt=check_in
     ).values_list('room_id', flat=True)
@@ -321,3 +322,12 @@ def delete_booking(request, pk):
     return Response(
         {"message": "Booking deleted"}
     )
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def room_types(request):
+    types = RoomType.objects.all()
+    serializer = RoomTypeSerializer(types, many=True)
+    return Response(serializer.data)

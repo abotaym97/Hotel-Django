@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Hotel , Room , Booking , BookingSettings
+from .models import Hotel , Room , Booking , BookingSettings, RoomType
 from django.contrib.auth.models import User
 from .models import BookingSettings
 from datetime import timedelta
@@ -153,4 +153,12 @@ class UserSerializer(serializers.ModelSerializer):
 class BookingSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = BookingSettings
+        fields = '__all__'
+
+
+
+
+class RoomTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoomType
         fields = '__all__'
