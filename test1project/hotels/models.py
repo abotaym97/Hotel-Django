@@ -55,7 +55,7 @@ class Booking(models.Model):
     guest_phone = models.CharField(max_length=20)
     guest_country = models.CharField(max_length=100)
     # user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    user = models.ForeignKey(User , on_delete=models.CASCADE,null=True, blank=True)
+    user = models.ForeignKey(User , on_delete=models.SET_NULL,null=True, blank=True)
     room = models.ForeignKey(Room , on_delete=models.CASCADE)
     check_in = models.DateField()
     check_out = models.DateField()
@@ -99,6 +99,16 @@ class BookingSettings(models.Model):
 class CustomerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     phone = models.CharField(max_length=20)
+    country = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.user.username
+
+
+
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    phone = models.CharField(max_length=30)
     country = models.CharField(max_length=100)
 
     def __str__(self):

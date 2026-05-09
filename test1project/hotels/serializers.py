@@ -125,9 +125,14 @@ class BookingSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        
-        validated_data.pop('user', None)
+
+        request = self.context.get('request')
+
+        if request and request.user.is_authenticated:
+            validated_data['user'] = request.user
+
         validated_data.pop('room_type', None)
+
         return Booking.objects.create(**validated_data)
 
     # def validate(self, data):

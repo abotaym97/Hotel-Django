@@ -3,13 +3,16 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated , IsAdminUser , AllowAny
 from rest_framework import status
 from .serializers import RegisterSerializer, RoomTypeSerializer , UserSerializer
-from .models import Hotel , Room , Booking , BookingSettings, RoomType
+from .models import Hotel, Profile , Room , Booking , BookingSettings, RoomType
 from .serializers import HotelSerializer , RoomSerializer , BookingSerializer , BookingSettingsSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from django.db.models import ProtectedError
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 
 @api_view(['GET'])
@@ -174,7 +177,13 @@ def register(request):
     serializer = RegisterSerializer(data=request.data)
 
     if serializer.is_valid():
-        serializer.save()
+        user = serializer.save()
+        Profile.objects.create(
+            user=user,
+            phone=request.data.get('phone'),
+            country=request.data.get('country'))
+        
+        
         return Response(
             serializer.data,
             status=status.HTTP_201_CREATED
@@ -374,3 +383,25 @@ def room_type_detail(request, pk):
     #     {"error": "Cannot delete this room type because it has rooms."},
     #     status=400
     # )
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def profile(request):
+    profile, created = Profile.objects.get_or_create(
+        user=request.user,
+        defaults={
+            "phone": "",
+            "country": ""
+        }
+    )
+
+    data = {
+        "first_name": request.user.first_name or request.user.username,
+        "email": request.user.email,
+        "phone": profile.phone,
+        "country": profile.country,
+    }
+
+    return Response(data)
