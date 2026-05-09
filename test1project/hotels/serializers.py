@@ -11,9 +11,24 @@ class HotelSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class RoomSerializer(serializers.ModelSerializer):
+    room_type_name = serializers.CharField(source='room_type.name', read_only=True)
+    room_type_image = serializers.ImageField(source='room_type.image', read_only=True)
+
     class Meta:
         model = Room
-        fields = '__all__'
+        fields = [
+            'id',
+            'hotel',
+            'room_number',
+            'room_type',
+            'room_type_name',
+            'room_type_image',
+            'Price',
+            'capacity',
+            'is_available',
+            'available_from',
+            'available_to',
+        ]
 
 
 class BookingSerializer(serializers.ModelSerializer):

@@ -61,13 +61,19 @@ def available_rooms(request):
     rooms = Room.objects.filter(is_available=True)
 
     if room_type:
-        rooms = rooms.filter(room_type=room_type)
+        rooms = rooms.filter(room_type__name__iexact=room_type)
 
     booked_rooms = Booking.objects.filter(
-        room__room_type=room_type,
         check_in__lt=check_out,
-        check_out__gt=check_in
+        check_out__gt=check_in,
+
     ).values_list('room_id', flat=True)
+
+    
+    rooms = rooms.filter(
+        available_from__lte=check_in,
+        available_to__gte=check_out
+    )
 
     available = rooms.exclude(id__in=booked_rooms)
 
@@ -279,7 +285,7 @@ def delete_room(request, pk):
 
 
 
-@api_view(['PUT'])
+@api_view(['PUT', 'PATCH'])
 def update_room(request, pk):
 
     try:
@@ -293,7 +299,8 @@ def update_room(request, pk):
 
     serializer = RoomSerializer(
         room,
-        data=request.data
+        data=request.data,
+        partial=True
     )
 
     if serializer.is_valid():
@@ -325,9 +332,30 @@ def delete_booking(request, pk):
 
 
 
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def room_types(request):
-    types = RoomType.objects.all()
-    serializer = RoomTypeSerializer(types, many=True)
-    return Response(serializer.data)
+    if request.method == 'GET':
+        types = RoomType.objects.all()
+        serializer = RoomTypeSerializer(types, many=True)
+        return Response(serializer.data)
+
+    serializer = RoomTypeSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+# لإدارة أنواع الغرف (CRUD) - حذف نوع غرفة
+@api_view(['DELETE'])
+def room_type_detail(request, pk):
+
+    try:
+        room_type = RoomType.objects.get(id=pk)
+    except RoomType.DoesNotExist:
+        return Response(status=404)
+
+    room_type.delete()
+    return Response(status=204)
