@@ -122,8 +122,23 @@ def my_bookings(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def profile(request):
-    serializer = UserSerializer(request.user)
-    return Response(serializer.data)
+    profile, created = Profile.objects.get_or_create(
+        user=request.user,
+        defaults={
+            "phone": "",
+            "country": ""
+        }
+    )
+
+    data = {
+        "first_name": request.user.first_name or request.user.username,
+        "email": request.user.email,
+        "phone": profile.phone,
+        "country": profile.country,
+        "is_staff": request.user.is_staff,
+    }
+
+    return Response(data)
 
 
 @api_view(['GET'])
@@ -386,22 +401,44 @@ def room_type_detail(request, pk):
 
 
 
+# @api_view(['GET'])
+# @permission_classes([IsAuthenticated])
+# def profile(request):
+#     profile, created = Profile.objects.get_or_create(
+#         user=request.user,
+#         defaults={
+#             "phone": "",
+#             "country": ""
+#         }
+#     )
+
+#     data = {
+#         "first_name": request.user.first_name or request.user.username,
+#         "email": request.user.email,
+#         "phone": profile.phone,
+#         "country": profile.country,
+#     }
+
+#     return Response(data)
+
+
+
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def profile(request):
-    profile, created = Profile.objects.get_or_create(
-        user=request.user,
-        defaults={
-            "phone": "",
-            "country": ""
-        }
-    )
+@permission_classes([IsAdminUser])
+def admin_bookings(request):
+    bookings = Booking.objects.all().order_by('-id')
+    serializer = BookingSerializer(bookings, many=True)
+    return Response(serializer.data)
 
-    data = {
-        "first_name": request.user.first_name or request.user.username,
-        "email": request.user.email,
-        "phone": profile.phone,
-        "country": profile.country,
-    }
 
-    return Response(data)
+from django.utils.timezone import now
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def current_bookings(request):
+    bookings = Booking.objects.filter(
+        check_out__gte=now().date()
+    ).order_by('check_in')
+
+    serializer = BookingSerializer(bookings, many=True)
+    return Response(serializer.data)
