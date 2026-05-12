@@ -28,4 +28,5 @@ urlpatterns = [
     path('admin/bookings/', views.admin_bookings),
     path('admin/current-bookings/', views.current_bookings),
     path('room-types/<int:pk>/rooms/', views.rooms_by_type),
+    path('rooms/bulk-availability/', views.bulk_room_availability),
 ]

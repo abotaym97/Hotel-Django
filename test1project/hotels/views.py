@@ -13,6 +13,10 @@ from django.db.models import ProtectedError
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from datetime import date
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 
 @api_view(['GET'])
@@ -233,44 +237,46 @@ def booking_settings(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([IsAuthenticated])
 def dashboard_stats(request):
+    today = date.today()
 
+    total_room_types = RoomType.objects.count()
     total_rooms = Room.objects.count()
 
     available_rooms = Room.objects.filter(
-        is_available=True
+        is_available=True,
+        status='ON'
     ).count()
 
-    total_bookings = Booking.objects.count()
+    unavailable_rooms = Room.objects.filter(
+        status='OFF'
+    ).count()
 
-    occupied_rooms = total_rooms - available_rooms
+    current_bookings = Booking.objects.filter(
+        check_in__lte=today,
+        check_out__gt=today
+    ).count()
 
-    occupancy_rate = 0
+    current_guests = current_bookings
 
-    if total_rooms > 0:
-        occupancy_rate = round(
-            (occupied_rooms / total_rooms) * 100
-        )
-    recent_bookings = Booking.objects.select_related(
-    'user',
-    'room'
-    ).order_by('-created_at')[:5]
+    departures_today = Booking.objects.filter(
+        check_out=today
+    ).count()
+
+    arrivals = Booking.objects.filter(
+        check_in__gt=today
+    ).count()
+
     return Response({
+        "total_room_types": total_room_types,
         "total_rooms": total_rooms,
         "available_rooms": available_rooms,
-        "total_bookings": total_bookings,
-        "occupancy_rate": occupancy_rate,
-        "recent_bookings": [
-    {
-        "id": booking.id,
-        "user": booking.user.username,
-        "room": booking.room.room_number,
-        "check_in": booking.check_in,
-        "check_out": booking.check_out,
-    }
-    for booking in recent_bookings
-        ]
+        "unavailable_rooms": unavailable_rooms,
+        "current_bookings": current_bookings,
+        "current_guests": current_guests,
+        "departures_today": departures_today,
+        "arrivals": arrivals,
     })
 
 
@@ -481,3 +487,30 @@ def rooms_by_type(request, pk):
     rooms = Room.objects.filter(room_type_id=pk)
     serializer = RoomSerializer(rooms, many=True)
     return Response(serializer.data)
+
+
+
+#bulk availability add
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def bulk_room_availability(request):
+    room_type_id = request.data.get("room_type")
+    count = int(request.data.get("count", 0))
+    available_from = request.data.get("available_from")
+    available_to = request.data.get("available_to")
+    status_value = request.data.get("status", "ON")
+
+    rooms = Room.objects.filter(
+        room_type_id=room_type_id
+    ).order_by("room_number")[:count]
+
+    for room in rooms:
+        room.is_available = True
+        room.available_from = available_from
+        room.available_to = available_to
+        room.status = status_value
+        room.save()
+
+    return Response({
+        "message": f"{len(rooms)} rooms updated successfully"
+    })
