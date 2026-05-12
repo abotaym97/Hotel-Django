@@ -18,7 +18,8 @@ urlpatterns = [
     path('booking-settings/', booking_settings),
     path('dashboard-stats/', dashboard_stats),
     path('all-bookings/', all_bookings),
-    path('rooms/<int:pk>/', delete_room),
+    path('rooms/<int:pk>/', views.room_detail),
+    path('rooms/<int:pk>/delete/', delete_room),
     path('rooms/<int:pk>/update/', update_room),
     path('bookings/<int:pk>/', delete_booking),
     path('room-types/', room_types),
@@ -26,4 +27,5 @@ urlpatterns = [
     path("profile/", views.profile),
     path('admin/bookings/', views.admin_bookings),
     path('admin/current-bookings/', views.current_bookings),
+    path('room-types/<int:pk>/rooms/', views.rooms_by_type),
 ]

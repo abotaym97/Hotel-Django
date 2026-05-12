@@ -13,8 +13,27 @@ class HotelSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class RoomSerializer(serializers.ModelSerializer):
-    room_type_name = serializers.CharField(source='room_type.name', read_only=True)
-    room_type_image = serializers.ImageField(source='room_type.image', read_only=True)
+    room_type_name = serializers.CharField(
+        source='room_type.name',
+        read_only=True
+    )
+
+    room_type_image = serializers.ImageField(
+        source='room_type.image',
+        read_only=True
+    )
+
+    price = serializers.DecimalField(
+        source='room_type.price',
+        max_digits=8,
+        decimal_places=2,
+        read_only=True
+    )
+
+    capacity = serializers.IntegerField(
+        source='room_type.capacity',
+        read_only=True
+    )
 
     class Meta:
         model = Room
@@ -25,16 +44,16 @@ class RoomSerializer(serializers.ModelSerializer):
             'room_type',
             'room_type_name',
             'room_type_image',
-            'Price',
+            'price',
             'capacity',
             'is_available',
             'available_from',
             'available_to',
+            'status',
         ]
 
 
 class BookingSerializer(serializers.ModelSerializer):
-
     room_number = serializers.CharField(source='room.room_number', read_only=True)
     room_type_display = serializers.CharField(source='room.room_type', read_only=True)
     room_type = serializers.CharField(write_only=True)
@@ -42,7 +61,6 @@ class BookingSerializer(serializers.ModelSerializer):
         queryset=Room.objects.all(),
         required=False
 )
-
     class Meta:
         model = Booking
         fields = [
@@ -110,7 +128,8 @@ class BookingSerializer(serializers.ModelSerializer):
             room_type__name__iexact=room_type,
             is_available=True,
             available_from__lte=check_in,
-            available_to__gte=check_out
+            available_to__gte=check_out,
+            status='ON'
         ).exclude(
             id__in=booked_rooms
         ).first()
@@ -204,6 +223,14 @@ class BookingSettingsSerializer(serializers.ModelSerializer):
 
 
 class RoomTypeSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = RoomType
-        fields = '__all__'
+        fields = [
+            'id',
+            'name',
+            'image',
+            'description',
+            'price',
+            'capacity',
+        ]

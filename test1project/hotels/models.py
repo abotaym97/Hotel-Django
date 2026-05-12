@@ -15,38 +15,41 @@ class Hotel(models.Model):
 
 
 
-
+#RoomType
 class RoomType(models.Model):
     name = models.CharField(max_length=100)
     image = models.ImageField(upload_to='room_types/')
     description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=8, decimal_places=2)
+    capacity = models.IntegerField(default=1)
 
     def __str__(self):
         return self.name
 #Room
 class Room(models.Model):
-
-    ROOM_TYPES = [
-        ('deluxe king' , 'Deluxe King'),
-        ('deluxe twin' , 'Deluxe Twin'),
-        ('junior king' , 'Junior King'),
-        ('junior twin' , 'Junior Twin'),
-        ('executive suite' , 'Executive Suite'),
-    ]
-
-
-    hotel = models.ForeignKey(Hotel,on_delete=models.CASCADE)
+    hotel = models.ForeignKey(Hotel, on_delete=models.CASCADE)
     room_number = models.IntegerField()
-    room_type = models.ForeignKey(RoomType, on_delete=models.PROTECT, related_name="rooms")
-    # room_type = models.CharField(max_length=50, choices=ROOM_TYPES , default='deluxe king')
-    Price = models.DecimalField(max_digits=8,decimal_places=2)
-    capacity = models.IntegerField(default=1)
+    room_type = models.ForeignKey(
+        RoomType,
+        on_delete=models.PROTECT,
+        related_name="rooms"
+    )
     is_available = models.BooleanField(default=True)
     available_from = models.DateField(null=True, blank=True)
     available_to = models.DateField(null=True, blank=True)
+    STATUS_CHOICES = (
+        ('ON', 'Available'),
+        ('OFF', 'Closed'),
+    )
+
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default='ON'
+    )
 
     def __str__(self):
-        return f"Room {self.room_number} - {self.hotel.name}"
+        return f"Room {self.room_number} - {self.room_type.name}"
     
 #Booking
 class Booking(models.Model):

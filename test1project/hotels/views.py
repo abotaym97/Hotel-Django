@@ -61,7 +61,7 @@ def available_rooms(request):
     check_out = request.GET.get('check_out')
     room_type = request.GET.get('room_type')
 
-    rooms = Room.objects.filter(is_available=True)
+    rooms = Room.objects.filter(is_available=True, status='ON')
 
     if room_type:
         rooms = rooms.filter(room_type__name__iexact=room_type)
@@ -375,29 +375,44 @@ def room_types(request):
     return Response(serializer.errors, status=400)
 
 # لإدارة أنواع الغرف (CRUD) - حذف نوع غرفة
-@api_view(['DELETE'])
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 @permission_classes([AllowAny])
 def room_type_detail(request, pk):
     try:
         room_type = RoomType.objects.get(id=pk)
     except RoomType.DoesNotExist:
-        return Response({"error": "Room type not found"}, status=404)
-
-    if room_type.rooms.exists():
         return Response(
-            {"error": "Cannot delete this room type because it has rooms."},
-            status=400
+            {"error": "Room type not found"},
+            status=404
         )
 
-    room_type.delete()
-    return Response(status=204)
-    # try:
-    #     room_type.delete()
-    # except ProtectedError:
-    #     return Response(
-    #     {"error": "Cannot delete this room type because it has rooms."},
-    #     status=400
-    # )
+    if request.method == 'GET':
+        serializer = RoomTypeSerializer(room_type)
+        return Response(serializer.data)
+
+    if request.method in ['PUT', 'PATCH']:
+        serializer = RoomTypeSerializer(
+            room_type,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=400)
+
+    if request.method == 'DELETE':
+
+        if room_type.rooms.exists():
+            return Response(
+                {"error": "Cannot delete this room type because it has rooms."},
+                status=400
+            )
+
+        room_type.delete()
+        return Response(status=204)
 
 
 
@@ -441,4 +456,28 @@ def current_bookings(request):
     ).order_by('check_in')
 
     serializer = BookingSerializer(bookings, many=True)
+    return Response(serializer.data)
+
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def room_detail(request, pk):
+    try:
+        room = Room.objects.get(id=pk)
+    except Room.DoesNotExist:
+        return Response(
+            {"error": "Room not found"},
+            status=404
+        )
+
+    serializer = RoomSerializer(room)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def rooms_by_type(request, pk):
+    rooms = Room.objects.filter(room_type_id=pk)
+    serializer = RoomSerializer(rooms, many=True)
     return Response(serializer.data)
