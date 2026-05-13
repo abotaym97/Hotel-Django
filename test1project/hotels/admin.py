@@ -14,7 +14,6 @@ admin.site.register(NearbyPlace)
 admin.site.register(Service)
 
 
-from django.contrib import admin
 from .models import Gallery, GalleryImage
 
 
