@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Hotel , Room , Booking , BookingSettings, RoomType
+from .models import Gallery, GalleryImage, Hotel, NearbyPlace, Restaurant , Room , Booking , BookingSettings, RoomType, Service
 from django.contrib.auth.models import User
 from .models import BookingSettings
 from datetime import timedelta
@@ -234,3 +234,39 @@ class RoomTypeSerializer(serializers.ModelSerializer):
             'price',
             'capacity',
         ]
+
+
+#restaurant
+class RestaurantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Restaurant
+        fields = '__all__'
+
+
+# Nearby Places
+class NearbyPlaceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NearbyPlace
+        fields = '__all__'
+
+
+# Services
+class ServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Service
+        fields = "__all__"
+
+#Gallery Serializer
+
+class GalleryImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GalleryImage
+        fields = "__all__"
+
+
+class GallerySerializer(serializers.ModelSerializer):
+    images = GalleryImageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Gallery
+        fields = "__all__"

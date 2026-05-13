@@ -2,8 +2,8 @@ from rest_framework.decorators import api_view , permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated , IsAdminUser , AllowAny
 from rest_framework import status
-from .serializers import RegisterSerializer, RoomTypeSerializer , UserSerializer
-from .models import Hotel, Profile , Room , Booking , BookingSettings, RoomType
+from .serializers import GalleryImageSerializer, RegisterSerializer, RestaurantSerializer, RoomTypeSerializer , UserSerializer
+from .models import GalleryImage, Hotel, NearbyPlace, Profile, Restaurant , Room , Booking , BookingSettings, RoomType, Service , Gallery
 from .serializers import HotelSerializer , RoomSerializer , BookingSerializer , BookingSettingsSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
@@ -17,6 +17,9 @@ from datetime import date
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from .serializers import NearbyPlaceSerializer , RestaurantSerializer , ServiceSerializer , GallerySerializer
+
+
 
 
 @api_view(['GET'])
@@ -514,3 +517,255 @@ def bulk_room_availability(request):
     return Response({
         "message": f"{len(rooms)} rooms updated successfully"
     })
+
+
+
+
+
+#restaurant
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def restaurants(request):
+    if request.method == 'GET':
+        data = Restaurant.objects.filter(is_active=True)
+        serializer = RestaurantSerializer(data, many=True)
+        return Response(serializer.data)
+
+    serializer = RestaurantSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+
+
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def restaurant_detail(request, pk):
+    try:
+        restaurant = Restaurant.objects.get(id=pk)
+    except Restaurant.DoesNotExist:
+        return Response({"error": "Restaurant not found"}, status=404)
+
+    if request.method == 'GET':
+        serializer = RestaurantSerializer(restaurant)
+        return Response(serializer.data)
+
+    if request.method == 'PUT':
+        serializer = RestaurantSerializer(
+            restaurant,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=400)
+
+    if request.method == 'DELETE':
+        restaurant.delete()
+        return Response(status=204)
+
+
+
+
+
+# Nearby Places
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def nearby_places(request):
+
+    if request.method == 'GET':
+        places = NearbyPlace.objects.filter(is_active=True)
+        serializer = NearbyPlaceSerializer(places, many=True)
+        return Response(serializer.data)
+
+    serializer = NearbyPlaceSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def nearby_place_detail(request, pk):
+    try:
+        place = NearbyPlace.objects.get(id=pk)
+    except NearbyPlace.DoesNotExist:
+        return Response({"error": "Place not found"}, status=404)
+
+    if request.method == 'GET':
+        serializer = NearbyPlaceSerializer(place)
+        return Response(serializer.data)
+
+    if request.method == 'PUT':
+        serializer = NearbyPlaceSerializer(
+            place,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=400)
+
+    if request.method == 'DELETE':
+        place.delete()
+        return Response(status=204)
+    
+
+
+# Services
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def services(request):
+    if request.method == 'GET':
+        data = Service.objects.filter(is_active=True)
+        serializer = ServiceSerializer(data, many=True)
+        return Response(serializer.data)
+
+    serializer = ServiceSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def service_detail(request, pk):
+    try:
+        service = Service.objects.get(id=pk)
+    except Service.DoesNotExist:
+        return Response({"error": "Service not found"}, status=404)
+
+    if request.method == 'GET':
+        serializer = ServiceSerializer(service)
+        return Response(serializer.data)
+
+    if request.method == 'PUT':
+        serializer = ServiceSerializer(service, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    if request.method == 'DELETE':
+        service.delete()
+        return Response(status=204)
+    
+# End Services
+
+
+
+# Gallery List/Create
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def galleries(request):
+
+    if request.method == 'GET':
+        data = Gallery.objects.filter(is_active=True)
+        serializer = GallerySerializer(data, many=True)
+        return Response(serializer.data)
+
+    serializer = GallerySerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+
+# Gallery Detail
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def gallery_detail(request, pk):
+
+    try:
+        gallery = Gallery.objects.get(id=pk)
+    except Gallery.DoesNotExist:
+        return Response(
+            {"error": "Gallery not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # GET
+    if request.method == 'GET':
+        serializer = GallerySerializer(gallery)
+        return Response(serializer.data)
+
+    # PUT
+    if request.method == 'PUT':
+        serializer = GallerySerializer(
+            gallery,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=400)
+
+    # DELETE
+    gallery.delete()
+    return Response(status=204)
+
+
+# Gallery Images
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def gallery_images(request):
+
+    serializer = GalleryImageSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def gallery_image_detail(request, pk):
+
+    try:
+        image = GalleryImage.objects.get(id=pk)
+    except GalleryImage.DoesNotExist:
+        return Response(
+            {"error": "Image not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # PUT
+    if request.method == 'PUT':
+
+        serializer = GalleryImageSerializer(
+            image,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=400)
+
+    # DELETE
+    image.delete()
+    return Response(status=204)

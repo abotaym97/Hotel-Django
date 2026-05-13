@@ -116,3 +116,71 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.user.username
+    
+
+
+#restaurant
+class Restaurant(models.Model):
+    name = models.CharField(max_length=100)
+    image = models.ImageField(upload_to='restaurants/')
+    category = models.CharField(max_length=100, blank=True)
+    description = models.TextField(blank=True)
+    price_info = models.TextField(blank=True)
+    breakfast_time = models.CharField(max_length=100, blank=True)
+    lunch_time = models.CharField(max_length=100, blank=True)
+    dinner_time = models.CharField(max_length=100, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+    
+
+
+# Nearby Places
+
+class NearbyPlace(models.Model):
+    name_ar = models.CharField(max_length=150)
+    name_en = models.CharField(max_length=150)
+    image = models.ImageField(upload_to='nearby_places/')
+    location = models.CharField(max_length=255)
+    distance = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name_en
+    
+
+
+# Services
+class Service(models.Model):
+    title = models.CharField(max_length=100)
+    description = models.TextField()
+    image = models.ImageField(upload_to='services/')
+    price = models.CharField(max_length=50, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.title
+    
+
+# Gallery
+class Gallery(models.Model):
+    title_ar = models.CharField(max_length=255)
+    title_en = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.title_en
+
+
+class GalleryImage(models.Model):
+    gallery = models.ForeignKey(
+        Gallery,
+        related_name="images",
+        on_delete=models.CASCADE
+    )
+    image = models.ImageField(upload_to="gallery/")
+
+    def __str__(self):
+        return self.gallery.title_en
