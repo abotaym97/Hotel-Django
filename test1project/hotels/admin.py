@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CustomerProfile, Hotel, Restaurant ,  Room ,  Booking, RoomType , NearbyPlace, Service , Gallery ,BookingSettings ,Profile ,GalleryImage
+from .models import CustomerProfile, Hotel, Restaurant, Review ,  Room ,  Booking, RoomType , NearbyPlace, Service , Gallery ,BookingSettings ,Profile ,GalleryImage
 
 
 admin.site.register(Hotel)
@@ -12,6 +12,7 @@ admin.site.register(Profile)
 admin.site.register(Restaurant)
 admin.site.register(NearbyPlace)
 admin.site.register(Service)
+admin.site.register(Review)
 
 
 from .models import Gallery, GalleryImage

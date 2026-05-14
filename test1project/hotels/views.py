@@ -1,9 +1,11 @@
+from urllib import request
+
 from rest_framework.decorators import api_view , permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated , IsAdminUser , AllowAny
 from rest_framework import status
-from .serializers import GalleryImageSerializer, RegisterSerializer, RestaurantSerializer, RoomTypeSerializer , UserSerializer
-from .models import GalleryImage, Hotel, NearbyPlace, Profile, Restaurant , Room , Booking , BookingSettings, RoomType, Service , Gallery
+from .serializers import GalleryImageSerializer, RegisterSerializer, RestaurantSerializer, ReviewSerializer, RoomTypeSerializer , UserSerializer
+from .models import GalleryImage, Hotel, NearbyPlace, Profile, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service , Gallery
 from .serializers import HotelSerializer , RoomSerializer , BookingSerializer , BookingSettingsSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
@@ -49,7 +51,14 @@ def get_rooms(request):
 @permission_classes([AllowAny])
 def bookings(request):
     if request.method == 'GET':
-        bookings = Booking.objects.filter(user=request.user)
+        if request.user.is_authenticated and request.user.is_staff:
+            bookings = Booking.objects.all()
+        else:
+            bookings = Booking.objects.filter(user=request.user)
+
+
+
+
         serializer = BookingSerializer(bookings, many = True)
         return Response(serializer.data)
     
@@ -769,3 +778,109 @@ def gallery_image_detail(request, pk):
     # DELETE
     image.delete()
     return Response(status=204)
+
+
+
+
+# Review List/Create
+# Reviews
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def reviews(request):
+
+    if request.method == 'GET':
+        data = Review.objects.filter(is_active=True)
+        serializer = ReviewSerializer(data, many=True)
+        return Response(serializer.data)
+
+    serializer = ReviewSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def review_detail(request, pk):
+
+    try:
+        review = Review.objects.get(id=pk)
+
+    except Review.DoesNotExist:
+        return Response(
+            {"error": "Review not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # GET
+    if request.method == 'GET':
+        serializer = ReviewSerializer(review)
+        return Response(serializer.data)
+
+    # PUT
+    if request.method == 'PUT':
+
+        serializer = ReviewSerializer(
+            review,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=400)
+
+    # DELETE
+    review.delete()
+    return Response(status=204)
+
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def submit_review(request):
+    booking_code = request.data.get("booking_code")
+
+    if not booking_code:
+        return Response(
+            {"error": "Booking code is required"},
+            status=400
+        )
+
+    try:
+        booking = Booking.objects.get(booking_code=booking_code)
+    except Booking.DoesNotExist:
+        return Response(
+            {"error": "Invalid booking code"},
+            status=404
+        )
+
+    if booking.review_used:
+        return Response(
+            {"error": "This booking code has already been used for a review"},
+            status=400
+        )
+
+    serializer = ReviewSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save(
+            booking=booking,
+            is_active=False
+        )
+
+        booking.review_used = True
+        booking.save()
+
+        return Response(
+            {"message": "Review submitted and waiting for approval"},
+            status=201
+        )
+
+    return Response(serializer.errors, status=400)

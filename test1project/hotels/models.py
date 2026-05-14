@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+import uuid
 
 
 #Hotel
@@ -63,23 +64,18 @@ class Booking(models.Model):
     check_in = models.DateField()
     check_out = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
+    booking_code = models.CharField(max_length=20,unique=True,blank=True,null=True)
+    review_used = models.BooleanField(default=False)
 
+    def save(self, *args, **kwargs):
 
-    # def clean(self):
-    #     #تحقق من وجود حجز بنفس الفترة
-    #     if Booking.objects.filter(
-    #         room = self.room,
-    #         check_in__lt = self.check_out,
-    #         check_out__gt = self.check_in
-    #     ).exists():
-    #         raise ValidationError("This Room is already booked for these dates")
-        
-    # def save(self , *args , **kwargs):
-    #     self.clean()
-    #     super().save(*args, **kwargs)
+        if not self.booking_code:
+            self.booking_code = (
+                "NDH-" +
+                str(uuid.uuid4()).split("-")[0].upper()
+            )
 
-    
-    
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.guest_name} - Room {self.room.room_number}"
@@ -184,3 +180,24 @@ class GalleryImage(models.Model):
 
     def __str__(self):
         return self.gallery.title_en
+    
+
+
+#Testimonials / Reviews
+
+class Review(models.Model):
+    booking = models.OneToOneField(Booking,on_delete=models.CASCADE,related_name="review",null=True,blank=True)
+    name = models.CharField(max_length=100)
+    image = models.ImageField(upload_to='reviews/')
+    rating = models.IntegerField(default=5)
+    comment_ar = models.TextField()
+    comment_en = models.TextField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+    
+
+
+

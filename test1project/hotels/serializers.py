@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Gallery, GalleryImage, Hotel, NearbyPlace, Restaurant , Room , Booking , BookingSettings, RoomType, Service
+from .models import Gallery, GalleryImage, Hotel, NearbyPlace, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service
 from django.contrib.auth.models import User
 from .models import BookingSettings
 from datetime import timedelta
@@ -76,6 +76,8 @@ class BookingSerializer(serializers.ModelSerializer):
             'guest_email',
             'guest_phone',
             'guest_country',
+            'booking_code',
+            'review_used',
         ]
         read_only_fields = ['user']
 
@@ -269,4 +271,12 @@ class GallerySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Gallery
+        fields = "__all__"
+
+
+## Review Serializer
+
+class ReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
         fields = "__all__"

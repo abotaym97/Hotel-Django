@@ -40,4 +40,8 @@ urlpatterns = [
     path('galleries/<int:pk>/', views.gallery_detail),
     path('gallery-images/', views.gallery_images),
     path('gallery-images/<int:pk>/', views.gallery_image_detail),
+    path('reviews/', views.reviews),
+    path('reviews/<int:pk>/', views.review_detail),
+    path('submit-review/', views.submit_review),
+    
 ]
