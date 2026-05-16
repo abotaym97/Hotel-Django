@@ -5,6 +5,7 @@ from .models import BookingSettings
 from datetime import timedelta
 from django.contrib.auth.models import User
 from .models import CustomerProfile
+from django.contrib.auth.models import User, Group
 
 
 class HotelSerializer(serializers.ModelSerializer):
@@ -78,6 +79,8 @@ class BookingSerializer(serializers.ModelSerializer):
             'guest_country',
             'booking_code',
             'review_used',
+            'adults',
+            'children'
         ]
         read_only_fields = ['user']
 
@@ -189,7 +192,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         country = validated_data.pop('country')
 
         user = User.objects.create_user(
-            username=validated_data['username'],
+            username=validated_data['email'],
             email=validated_data['email'],
             password=validated_data['password']
         )
@@ -277,6 +280,68 @@ class GallerySerializer(serializers.ModelSerializer):
 ## Review Serializer
 
 class ReviewSerializer(serializers.ModelSerializer):
+    booking_code = serializers.CharField(
+        source="booking.booking_code",
+        read_only=True
+    )
+
     class Meta:
         model = Review
-        fields = "__all__"
+        fields = [
+            'id',
+            'booking',
+            'booking_code',
+            'name',
+            'rating',
+            'comment_en',
+            'created_at',
+            'is_active'
+            
+        ]
+
+
+
+
+#User Serializer
+class StaffUserSerializer(serializers.ModelSerializer):
+    groups = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Group.objects.all(),
+        required=False
+    )
+
+    password = serializers.CharField(
+        write_only=True,
+        required=False
+    )
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'is_staff',
+            'is_active',
+            'groups',
+            'password',
+        ]
+
+    def create(self, validated_data):
+        groups = validated_data.pop('groups', [])
+        password = validated_data.pop('password')
+
+        user = User.objects.create_user(
+            username=validated_data.get('email'),
+            email=validated_data.get('email'),
+            password=password,
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            is_staff=True,
+            is_active=validated_data.get('is_active', True),
+        )
+
+        user.groups.set(groups)
+        return user

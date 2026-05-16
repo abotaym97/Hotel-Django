@@ -66,6 +66,8 @@ class Booking(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     booking_code = models.CharField(max_length=20,unique=True,blank=True,null=True)
     review_used = models.BooleanField(default=False)
+    adults = models.PositiveIntegerField(default=1)
+    children = models.PositiveIntegerField(default=0)
 
     def save(self, *args, **kwargs):
 

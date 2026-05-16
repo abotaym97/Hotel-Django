@@ -19,7 +19,10 @@ from datetime import date
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .serializers import NearbyPlaceSerializer , RestaurantSerializer , ServiceSerializer , GallerySerializer
+from .serializers import NearbyPlaceSerializer , RestaurantSerializer , ServiceSerializer , GallerySerializer,ReviewSerializer
+from django.contrib.auth.models import User, Group
+from .serializers import StaffUserSerializer
+from django.contrib.auth.models import Group, Permission
 
 
 
@@ -790,7 +793,15 @@ def gallery_image_detail(request, pk):
 def reviews(request):
 
     if request.method == 'GET':
-        data = Review.objects.filter(is_active=True)
+
+        if request.user.is_authenticated and request.user.is_staff:
+            data = Review.objects.all().order_by('-created_at')
+
+        else:
+            data = Review.objects.filter(
+                is_active=True
+            ).order_by('-created_at')
+
         serializer = ReviewSerializer(data, many=True)
         return Response(serializer.data)
 
@@ -884,3 +895,181 @@ def submit_review(request):
         )
 
     return Response(serializer.errors, status=400)
+
+
+
+
+
+#users
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def staff_users(request):
+
+    if request.method == 'GET':
+
+        users = User.objects.filter(is_staff=True)
+
+        serializer = StaffUserSerializer(users, many=True)
+
+        return Response(serializer.data)
+
+    serializer = StaffUserSerializer(data=request.data)
+
+    if serializer.is_valid():
+
+        serializer.save()
+
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+
+
+
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAdminUser])
+def staff_user_detail(request, pk):
+
+    try:
+        user = User.objects.get(id=pk, is_staff=True)
+
+    except User.DoesNotExist:
+        return Response(
+            {"error": "User not found"},
+            status=404
+        )
+
+    if request.method == 'GET':
+
+        serializer = StaffUserSerializer(user)
+
+        return Response(serializer.data)
+
+    if request.method == 'PUT':
+
+        serializer = StaffUserSerializer(
+            user,
+            data=request.data,
+            partial=True
+        )
+
+        if serializer.is_valid():
+
+            groups = request.data.get('groups')
+
+            if groups is not None:
+                user.groups.set(groups)
+
+            password = request.data.get('password')
+
+            if password:
+                user.set_password(password)
+
+            serializer.save()
+
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=400)
+
+    user.delete()
+
+    return Response(status=204)
+
+
+
+
+# Groups and Permissions
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def groups(request):
+
+    if request.method == 'GET':
+        result = []
+
+        for group in Group.objects.all():
+            result.append({
+                "id": group.id,
+                "name": group.name,
+                "permissions": [
+                    p.codename for p in group.permissions.all()
+                ]
+            })
+
+        return Response(result)
+
+    name = request.data.get("name")
+    permissions = request.data.get("permissions", [])
+
+    group = Group.objects.create(name=name)
+
+    perms = Permission.objects.filter(
+        codename__in=permissions
+    )
+
+    group.permissions.set(perms)
+
+    return Response({
+        "id": group.id,
+        "name": group.name,
+        "permissions": [
+            p.codename for p in group.permissions.all()
+        ]
+    }, status=201)
+
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAdminUser])
+def group_detail(request, pk):
+
+    try:
+        group = Group.objects.get(id=pk)
+
+    except Group.DoesNotExist:
+        return Response(
+            {"error": "Group not found"},
+            status=404
+        )
+
+    if request.method == 'GET':
+
+        data = {
+            "id": group.id,
+            "name": group.name,
+            "permissions": [
+                p.codename for p in group.permissions.all()
+            ]
+        }
+
+        return Response(data)
+
+    if request.method == 'PUT':
+
+        name = request.data.get("name")
+        permissions = request.data.get("permissions", [])
+
+        if name:
+            group.name = name
+            group.save()
+
+        perms = Permission.objects.filter(
+            codename__in=permissions
+        )
+
+        group.permissions.set(perms)
+
+        return Response({
+            "id": group.id,
+            "name": group.name,
+            "permissions": [
+                p.codename for p in group.permissions.all()
+            ]
+        })
+
+    group.delete()
+
+    return Response(status=204)

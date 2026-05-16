@@ -43,5 +43,9 @@ urlpatterns = [
     path('reviews/', views.reviews),
     path('reviews/<int:pk>/', views.review_detail),
     path('submit-review/', views.submit_review),
+    path('staff-users/', views.staff_users),
+    path('staff-users/<int:pk>/', views.staff_user_detail),
+    path('groups/', views.groups),
+    path('groups/<int:pk>/', views.group_detail),
     
 ]
