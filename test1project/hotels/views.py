@@ -934,47 +934,52 @@ def staff_user_detail(request, pk):
 
     try:
         user = User.objects.get(id=pk, is_staff=True)
-
     except User.DoesNotExist:
         return Response(
             {"error": "User not found"},
             status=404
         )
-
+    
+    if user.is_superuser and not request.user.is_superuser:
+        return Response(
+            {"error": "Only superuser can modify another superuser"},
+            status=403
+        )
     if request.method == 'GET':
-
         serializer = StaffUserSerializer(user)
-
         return Response(serializer.data)
-
+    
     if request.method == 'PUT':
+
+        password = request.data.get('password')
+        groups = request.data.get('groups')
+
+        data = request.data.copy()
+
+        if not password:
+            data.pop('password', None)
 
         serializer = StaffUserSerializer(
             user,
-            data=request.data,
+            data=data,
             partial=True
         )
 
         if serializer.is_valid():
 
-            groups = request.data.get('groups')
+            user = serializer.save()
+
+            if password:
+                user.set_password(password)
+                user.save()
 
             if groups is not None:
                 user.groups.set(groups)
 
-            password = request.data.get('password')
-
-            if password:
-                user.set_password(password)
-
-            serializer.save()
-
             return Response(serializer.data)
 
         return Response(serializer.errors, status=400)
-
     user.delete()
-
     return Response(status=204)
 
 
@@ -1073,3 +1078,23 @@ def group_detail(request, pk):
     group.delete()
 
     return Response(status=204)
+
+
+
+
+#list all permissions
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def permissions_list(request):
+    permissions = Permission.objects.all()
+
+    data = [
+        {
+            "id": permission.id,
+            "name": permission.name,
+            "codename": permission.codename,
+        }
+        for permission in permissions
+    ]
+
+    return Response(data)

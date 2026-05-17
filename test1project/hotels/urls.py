@@ -47,5 +47,5 @@ urlpatterns = [
     path('staff-users/<int:pk>/', views.staff_user_detail),
     path('groups/', views.groups),
     path('groups/<int:pk>/', views.group_detail),
-    
+    path('permissions/', views.permissions_list),
 ]

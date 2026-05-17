@@ -327,6 +327,7 @@ class StaffUserSerializer(serializers.ModelSerializer):
             'is_active',
             'groups',
             'password',
+            'is_superuser',
         ]
 
     def create(self, validated_data):
