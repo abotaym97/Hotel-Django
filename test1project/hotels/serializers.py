@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Gallery, GalleryImage, Hotel, NearbyPlace, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service
+from .models import ActivityLog, Gallery, GalleryImage, Hotel, NearbyPlace, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service
 from django.contrib.auth.models import User
 from .models import BookingSettings
 from datetime import timedelta
@@ -346,3 +346,25 @@ class StaffUserSerializer(serializers.ModelSerializer):
 
         user.groups.set(groups)
         return user
+    
+
+
+
+#Logs 
+class ActivityLogSerializer(serializers.ModelSerializer):
+
+    user_email = serializers.CharField(
+        source='user.email',
+        read_only=True
+    )
+
+    class Meta:
+        model = ActivityLog
+
+        fields = [
+            'id',
+            'user_email',
+            'action',
+            'target',
+            'created_at',
+        ]

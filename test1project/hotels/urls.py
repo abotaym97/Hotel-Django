@@ -48,4 +48,5 @@ urlpatterns = [
     path('groups/', views.groups),
     path('groups/<int:pk>/', views.group_detail),
     path('permissions/', views.permissions_list),
+    path('logs/', views.logs),
 ]

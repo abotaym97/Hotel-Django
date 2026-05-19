@@ -4,8 +4,8 @@ from rest_framework.decorators import api_view , permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated , IsAdminUser , AllowAny
 from rest_framework import status
-from .serializers import GalleryImageSerializer, RegisterSerializer, RestaurantSerializer, ReviewSerializer, RoomTypeSerializer , UserSerializer
-from .models import GalleryImage, Hotel, NearbyPlace, Profile, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service , Gallery
+from .serializers import ActivityLogSerializer, GalleryImageSerializer, RegisterSerializer, RestaurantSerializer, ReviewSerializer, RoomTypeSerializer , UserSerializer
+from .models import ActivityLog, GalleryImage, Hotel, NearbyPlace, Profile, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service , Gallery
 from .serializers import HotelSerializer , RoomSerializer , BookingSerializer , BookingSettingsSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
@@ -23,7 +23,26 @@ from .serializers import NearbyPlaceSerializer , RestaurantSerializer , ServiceS
 from django.contrib.auth.models import User, Group
 from .serializers import StaffUserSerializer
 from django.contrib.auth.models import Group, Permission
+from django.utils.timezone import now
 
+
+
+
+
+
+
+
+
+
+
+# Utility function to create activity logs
+def create_log(user, action, target=""):
+
+    ActivityLog.objects.create(
+        user=user,
+        action=action,
+        target=target
+    )
 
 
 
@@ -44,10 +63,69 @@ def get_rooms(request):
         serializer = RoomSerializer(data=request.data)
 
         if serializer.is_valid():
-            serializer.save()
+            room = serializer.save()
+            create_log(request.user, "Created Room", f"{room.room_type.name} - Room {room.room_number}")
             return Response(serializer.data, status=201)
 
         return Response(serializer.errors, status=400)
+    
+
+
+@api_view(['DELETE'])
+def delete_room(request, pk):
+
+    try:
+        room = Room.objects.get(id=pk)
+
+    except Room.DoesNotExist:
+        return Response(
+            {"error": "Room not found"},
+            status=404
+        )
+    create_log(
+        request.user,
+        "Deleted Room",
+        f"{room.room_type.name} - Room {room.room_number}"
+    )
+
+    room.delete()
+
+    return Response(
+        {"message": "Room deleted"},
+        status=200
+    )
+
+
+
+
+@api_view(['PUT', 'PATCH'])
+def update_room(request, pk):
+
+    try:
+        room = Room.objects.get(id=pk)
+
+    except Room.DoesNotExist:
+        return Response(
+            {"error": "Room not found"},
+            status=404
+        )
+
+    serializer = RoomSerializer(
+        room,
+        data=request.data,
+        partial=True
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        create_log(
+            request.user,
+            "Updated Room",
+            f"{room.room_type.name} - Room {room.room_number}"
+        )
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=400)
 
 
 @api_view(['GET' , 'POST'])
@@ -58,17 +136,15 @@ def bookings(request):
             bookings = Booking.objects.all()
         else:
             bookings = Booking.objects.filter(user=request.user)
-
-
-
-
         serializer = BookingSerializer(bookings, many = True)
         return Response(serializer.data)
     
     if request.method == 'POST':
         serializer = BookingSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            serializer.save()
+            booking = serializer.save()
+            create_log(
+                request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -98,8 +174,8 @@ def available_rooms(request):
     )
 
     available = rooms.exclude(id__in=booked_rooms)
-
     serializer = RoomSerializer(available, many=True)
+
     return Response(serializer.data)
 
 
@@ -111,7 +187,7 @@ def booking_detail(request, id):
     except Booking.DoesNotExist:
         return Response({"error": "Not found"}, status=404)
 
-    # 🔐 هذا أهم سطر
+    
     if booking.user != request.user:
         return Response({"error": "Not allowed"}, status=403)
 
@@ -120,10 +196,12 @@ def booking_detail(request, id):
         serializer = BookingSerializer(booking, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            create_log(request.user, "Updated Booking", booking.id)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors)
 
     if request.method == 'DELETE':
+        create_log(request.user, "Deleted Booking", booking.id)
         booking.delete()
         return Response({"message": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
     
@@ -157,6 +235,8 @@ def profile(request):
         "is_staff": request.user.is_staff,
     }
 
+    # create_log(request.user, "Viewed Profile", request.user.id)
+
     return Response(data)
 
 
@@ -168,6 +248,8 @@ def hotel_detail(request, id):
         return Response({"error": "Hotel not found"})
 
     serializer = HotelSerializer(hotel)
+
+    create_log(request.user, "Viewed Hotel", hotel.id)
     return Response(serializer.data)
 
 
@@ -180,31 +262,6 @@ def rooms_by_hotel(request, hotel_id):
 
 
 
-# للتسجيل
-# @api_view(['POST'])
-# @permission_classes([AllowAny])
-# def register(request):
-
-#     username = request.data.get('username')
-#     email = request.data.get('email')
-#     password = request.data.get('password')
-
-#     if User.objects.filter(username=username).exists():
-#         return Response(
-#             {"error": "Username already exists"},
-#             status=status.HTTP_400_BAD_REQUEST
-#         )
-
-#     user = User.objects.create_user(
-#         username=username,
-#         email=email,
-#         password=password
-#     )
-
-#     return Response(
-#         {"message": "User created successfully"},
-#         status=status.HTTP_201_CREATED
-#     )
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
@@ -216,13 +273,12 @@ def register(request):
             user=user,
             phone=request.data.get('phone'),
             country=request.data.get('country'))
-        
-        
+        create_log(user, "Created Profile", profile.id)
         return Response(
             serializer.data,
             status=status.HTTP_201_CREATED
         )
-
+        
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -245,6 +301,7 @@ def booking_settings(request):
 
     if serializer.is_valid():
         serializer.save()
+        create_log(request.user, "Updated Booking Settings", settings.id)
         return Response(serializer.data)
 
     return Response(serializer.errors, status=400)
@@ -310,51 +367,7 @@ def all_bookings(request):
 
 
 
-@api_view(['DELETE'])
-def delete_room(request, pk):
 
-    try:
-        room = Room.objects.get(id=pk)
-
-    except Room.DoesNotExist:
-        return Response(
-            {"error": "Room not found"},
-            status=404
-        )
-
-    room.delete()
-
-    return Response(
-        {"message": "Room deleted"},
-        status=200
-    )
-
-
-
-
-@api_view(['PUT', 'PATCH'])
-def update_room(request, pk):
-
-    try:
-        room = Room.objects.get(id=pk)
-
-    except Room.DoesNotExist:
-        return Response(
-            {"error": "Room not found"},
-            status=404
-        )
-
-    serializer = RoomSerializer(
-        room,
-        data=request.data,
-        partial=True
-    )
-
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-
-    return Response(serializer.errors, status=400)
 
 
 
@@ -370,6 +383,12 @@ def delete_booking(request, pk):
             {"error": "Booking not found"},
             status=404
         )
+
+    create_log(
+        request.user,
+        "Deleted Booking",
+        booking.id
+    )
 
     booking.delete()
 
@@ -391,6 +410,7 @@ def room_types(request):
 
     if serializer.is_valid():
         serializer.save()
+        create_log(request.user, "Created Room Type", serializer.data['id'])
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)
@@ -420,6 +440,7 @@ def room_type_detail(request, pk):
 
         if serializer.is_valid():
             serializer.save()
+            create_log(request.user, "Updated Room Type", room_type.id)
             return Response(serializer.data)
 
         return Response(serializer.errors, status=400)
@@ -431,31 +452,13 @@ def room_type_detail(request, pk):
                 {"error": "Cannot delete this room type because it has rooms."},
                 status=400
             )
-
+        create_log(request.user, "Deleted Room Type", room_type.name)
         room_type.delete()
+        
         return Response(status=204)
 
 
 
-# @api_view(['GET'])
-# @permission_classes([IsAuthenticated])
-# def profile(request):
-#     profile, created = Profile.objects.get_or_create(
-#         user=request.user,
-#         defaults={
-#             "phone": "",
-#             "country": ""
-#         }
-#     )
-
-#     data = {
-#         "first_name": request.user.first_name or request.user.username,
-#         "email": request.user.email,
-#         "phone": profile.phone,
-#         "country": profile.country,
-#     }
-
-#     return Response(data)
 
 
 
@@ -467,7 +470,7 @@ def admin_bookings(request):
     return Response(serializer.data)
 
 
-from django.utils.timezone import now
+
 
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
@@ -525,6 +528,7 @@ def bulk_room_availability(request):
         room.available_to = available_to
         room.status = status_value
         room.save()
+        create_log(request.user, "Updated Room Availability", room.name)
 
     return Response({
         "message": f"{len(rooms)} rooms updated successfully"
@@ -547,6 +551,7 @@ def restaurants(request):
 
     if serializer.is_valid():
         serializer.save()
+        create_log(request.user, "Created Restaurant", serializer.data['id'])
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)
@@ -576,12 +581,15 @@ def restaurant_detail(request, pk):
 
         if serializer.is_valid():
             serializer.save()
+            create_log(request.user, "Updated Restaurant", f"{restaurant.name}")
             return Response(serializer.data)
 
         return Response(serializer.errors, status=400)
 
     if request.method == 'DELETE':
+        create_log(request.user, "Deleted Restaurant", restaurant.name)
         restaurant.delete()
+        
         return Response(status=204)
 
 
@@ -602,6 +610,7 @@ def nearby_places(request):
 
     if serializer.is_valid():
         serializer.save()
+        create_log(request.user, "Created Nearby Place", serializer.data['id'])
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)
@@ -627,12 +636,15 @@ def nearby_place_detail(request, pk):
 
         if serializer.is_valid():
             serializer.save()
+            create_log(request.user, "Updated Nearby Place", place.id)
             return Response(serializer.data)
 
         return Response(serializer.errors, status=400)
 
     if request.method == 'DELETE':
+        create_log(request.user, "Deleted Nearby Place", place.name)
         place.delete()
+        
         return Response(status=204)
     
 
@@ -649,6 +661,7 @@ def services(request):
     serializer = ServiceSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
+        create_log(request.user, "Created Service", serializer.data['id'])
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)
@@ -670,10 +683,12 @@ def service_detail(request, pk):
         serializer = ServiceSerializer(service, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            create_log(request.user, "Updated Service", service.id)
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
 
     if request.method == 'DELETE':
+        create_log(request.user, "Deleted Service", service.name)
         service.delete()
         return Response(status=204)
     
@@ -690,15 +705,12 @@ def galleries(request):
         data = Gallery.objects.filter(is_active=True)
         serializer = GallerySerializer(data, many=True)
         return Response(serializer.data)
-
     serializer = GallerySerializer(data=request.data)
-
     if serializer.is_valid():
-        serializer.save()
+        gallery = serializer.save()
+        create_log(request.user if request.user.is_authenticated else None, "Created Gallery", f" Gallery {gallery.title_en}")
         return Response(serializer.data, status=201)
-
     return Response(serializer.errors, status=400)
-
 
 # Gallery Detail
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -728,11 +740,13 @@ def gallery_detail(request, pk):
 
         if serializer.is_valid():
             serializer.save()
+            create_log(request.user if request.user.is_authenticated else None, "Updated Gallery", f" Gallery {gallery.title_en}")
             return Response(serializer.data)
 
         return Response(serializer.errors, status=400)
 
     # DELETE
+    create_log(request.user if request.user.is_authenticated else None, "Deleted Gallery", f" Gallery {gallery.title_en}")
     gallery.delete()
     return Response(status=204)
 
@@ -746,6 +760,7 @@ def gallery_images(request):
 
     if serializer.is_valid():
         serializer.save()
+        create_log(request.user, "Created Gallery Image", serializer.data['id'])
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)
@@ -774,11 +789,14 @@ def gallery_image_detail(request, pk):
 
         if serializer.is_valid():
             serializer.save()
+            create_log(request.user if request.user.is_authenticated else None, "Updated Gallery Image", f"Image {image.id} in Gallery {image.gallery.name}")
             return Response(serializer.data)
 
         return Response(serializer.errors, status=400)
 
     # DELETE
+    create_log(request.user if request.user.is_authenticated else None, "Deleted Gallery Image", f"Image {image.id} in Gallery {image.gallery.name}")
+
     image.delete()
     return Response(status=204)
 
@@ -809,6 +827,7 @@ def reviews(request):
 
     if serializer.is_valid():
         serializer.save()
+        create_log(request.user, "Created Review", serializer.data['id'])
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)
@@ -830,6 +849,7 @@ def review_detail(request, pk):
     # GET
     if request.method == 'GET':
         serializer = ReviewSerializer(review)
+        create_log(request.user if request.user.is_authenticated else None, "Viewed Review", f"{review.name} - {review.rating}/5")
         return Response(serializer.data)
 
     # PUT
@@ -843,11 +863,13 @@ def review_detail(request, pk):
 
         if serializer.is_valid():
             serializer.save()
+            create_log(request.user, "Updated Review", f"{review.name} - {review.rating}/5")
             return Response(serializer.data)
 
         return Response(serializer.errors, status=400)
 
     # DELETE
+    create_log(request.user, "Deleted Review", review.id)
     review.delete()
     return Response(status=204)
 
@@ -917,7 +939,8 @@ def staff_users(request):
 
     if serializer.is_valid():
 
-        serializer.save()
+        user = serializer.save()
+        create_log(request.user, "Created Staff User", user.email)
 
         return Response(serializer.data, status=201)
 
@@ -972,6 +995,7 @@ def staff_user_detail(request, pk):
             if password:
                 user.set_password(password)
                 user.save()
+                create_log(request.user, "Updated Staff User", user.email)
 
             if groups is not None:
                 user.groups.set(groups)
@@ -979,6 +1003,7 @@ def staff_user_detail(request, pk):
             return Response(serializer.data)
 
         return Response(serializer.errors, status=400)
+    create_log(request.user, "Deleted Staff User", user.email)
     user.delete()
     return Response(status=204)
 
@@ -1098,3 +1123,31 @@ def permissions_list(request):
     ]
 
     return Response(data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Logs 
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def logs(request):
+
+    data = ActivityLog.objects.all().order_by(
+        '-created_at'
+    )
+
+    serializer = ActivityLogSerializer(
+        data,
+        many=True
+    )
+
+    return Response(serializer.data)
