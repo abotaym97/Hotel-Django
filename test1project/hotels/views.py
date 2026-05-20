@@ -19,12 +19,12 @@ from datetime import date
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .serializers import NearbyPlaceSerializer , RestaurantSerializer , ServiceSerializer , GallerySerializer,ReviewSerializer
+from .serializers import NearbyPlaceSerializer ,ContactMessageSerializer,ContactSettingSerializer, RestaurantSerializer , ServiceSerializer , GallerySerializer,ReviewSerializer
 from django.contrib.auth.models import User, Group
 from .serializers import StaffUserSerializer
 from django.contrib.auth.models import Group, Permission
 from django.utils.timezone import now
-
+from .models import ContactSetting ,ContactMessage
 
 
 
@@ -1030,12 +1030,9 @@ def groups(request):
             })
 
         return Response(result)
-
     name = request.data.get("name")
     permissions = request.data.get("permissions", [])
-
     group = Group.objects.create(name=name)
-
     perms = Permission.objects.filter(
         codename__in=permissions
     )
@@ -1151,3 +1148,77 @@ def logs(request):
     )
 
     return Response(serializer.data)
+
+
+
+
+#Contact Us
+@api_view(['GET', 'PUT'])
+@permission_classes([AllowAny])
+def contact_settings(request):
+    setting = ContactSetting.objects.first()
+
+    if not setting:
+        setting = ContactSetting.objects.create(
+            phone="",
+            email="",
+            address=""
+        )
+
+    if request.method == 'GET':
+        serializer = ContactSettingSerializer(setting)
+        return Response(serializer.data)
+
+    serializer = ContactSettingSerializer(
+        setting,
+        data=request.data,
+        partial=True
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=400)
+
+
+
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def contact_messages(request):
+
+    if request.method == 'GET':
+        messages = ContactMessage.objects.all().order_by('-created_at')
+        serializer = ContactMessageSerializer(messages, many=True)
+        return Response(serializer.data)
+
+    serializer = ContactMessageSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+
+
+
+
+
+
+
+
+@api_view(['PUT'])
+@permission_classes([IsAdminUser])
+def contact_message_detail(request, pk):
+    try:
+        message = ContactMessage.objects.get(id=pk)
+    except ContactMessage.DoesNotExist:
+        return Response({"error": "Message not found"}, status=404)
+
+    message.is_read = request.data.get("is_read", message.is_read)
+    message.save()
+
+    return Response({"message": "Updated successfully"})

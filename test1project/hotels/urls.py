@@ -49,4 +49,7 @@ urlpatterns = [
     path('groups/<int:pk>/', views.group_detail),
     path('permissions/', views.permissions_list),
     path('logs/', views.logs),
+    path('contact-settings/', views.contact_settings),
+    path('contact-messages/', views.contact_messages),
+    path('contact-messages/<int:pk>/', views.contact_message_detail),
 ]

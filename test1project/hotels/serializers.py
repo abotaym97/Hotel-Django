@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import ActivityLog, Gallery, GalleryImage, Hotel, NearbyPlace, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service
 from django.contrib.auth.models import User
-from .models import BookingSettings
+from .models import BookingSettings , ContactSetting , ContactMessage
 from datetime import timedelta
 from django.contrib.auth.models import User
 from .models import CustomerProfile
@@ -368,3 +368,21 @@ class ActivityLogSerializer(serializers.ModelSerializer):
             'target',
             'created_at',
         ]
+
+
+
+
+
+
+
+#Contact Us
+class ContactSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactSetting
+        fields = "__all__"
+
+
+class ContactMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactMessage
+        fields = "__all__"

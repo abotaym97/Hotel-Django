@@ -224,3 +224,32 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.action}"
+
+
+
+#Contact Us
+class ContactSetting(models.Model):
+    hero_image = models.ImageField(
+        upload_to="contact/",
+        blank=True,
+        null=True
+    )
+    phone = models.CharField(max_length=50)
+    email = models.EmailField()
+    address = models.CharField(max_length=255)
+
+    def __str__(self):
+        return "Contact Settings"
+
+
+class ContactMessage(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone = models.CharField(max_length=50)
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.subject
