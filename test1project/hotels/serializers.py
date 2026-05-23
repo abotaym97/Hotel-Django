@@ -4,8 +4,19 @@ from django.contrib.auth.models import User
 from .models import BookingSettings , ContactSetting , ContactMessage
 from datetime import timedelta
 from django.contrib.auth.models import User
-from .models import CustomerProfile
+from .models import CustomerProfile,Notification,DashboardCardSetting
 from django.contrib.auth.models import User, Group
+
+
+
+
+
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = "__all__"
 
 
 class HotelSerializer(serializers.ModelSerializer):
@@ -385,4 +396,12 @@ class ContactSettingSerializer(serializers.ModelSerializer):
 class ContactMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactMessage
+        fields = "__all__"
+
+
+
+#Dashboard
+class DashboardCardSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DashboardCardSetting
         fields = "__all__"

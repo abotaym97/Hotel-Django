@@ -1,6 +1,6 @@
 from . import views
 from django.urls import path
-from .views import booking_settings,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
+from .views import booking_settings,notification_detail,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
 
 
 urlpatterns = [
@@ -52,4 +52,8 @@ urlpatterns = [
     path('contact-settings/', views.contact_settings),
     path('contact-messages/', views.contact_messages),
     path('contact-messages/<int:pk>/', views.contact_message_detail),
+    path('notifications/', views.notifications),
+    path('notifications/<int:pk>/', views.notification_detail),
+    path('dashboard-card-settings/',views.dashboard_card_settings),
+    path('dashboard-card-settings/<int:pk>/',views.dashboard_card_setting_detail),
 ]

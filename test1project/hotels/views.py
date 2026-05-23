@@ -21,10 +21,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .serializers import NearbyPlaceSerializer ,ContactMessageSerializer,ContactSettingSerializer, RestaurantSerializer , ServiceSerializer , GallerySerializer,ReviewSerializer
 from django.contrib.auth.models import User, Group
-from .serializers import StaffUserSerializer
+from .serializers import StaffUserSerializer , NotificationSerializer ,DashboardCardSettingSerializer
 from django.contrib.auth.models import Group, Permission
 from django.utils.timezone import now
-from .models import ContactSetting ,ContactMessage
+from .models import ContactSetting ,ContactMessage,DashboardCardSetting
+from .models import Notification
 
 
 
@@ -32,6 +33,13 @@ from .models import ContactSetting ,ContactMessage
 
 
 
+
+def create_notification(title, message, notification_type):
+    Notification.objects.create(
+        title=title,
+        message=message,
+        notification_type=notification_type
+    )
 
 
 
@@ -44,6 +52,27 @@ def create_log(user, action, target=""):
         target=target
     )
 
+
+
+
+
+
+
+
+
+@api_view(["GET"])
+def notifications(request):
+    notifications = Notification.objects.all().order_by("-created_at")
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(serializer.data)
+
+@api_view(["PUT"])
+@permission_classes([IsAdminUser])
+def notification_detail(request, pk):
+    notification = Notification.objects.get(id=pk)
+    notification.is_read = True
+    notification.save()
+    return Response({"message": "Notification marked as read"})
 
 
 @api_view(['GET'])
@@ -143,8 +172,8 @@ def bookings(request):
         serializer = BookingSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             booking = serializer.save()
-            create_log(
-                request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
+            create_notification("New Booking",f"New booking from {booking.user.email}","booking")
+            create_log(request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -202,6 +231,7 @@ def booking_detail(request, id):
 
     if request.method == 'DELETE':
         create_log(request.user, "Deleted Booking", booking.id)
+        create_notification("Booking Cancelled",f"Booking #{booking.id} was cancelled","cancel")
         booking.delete()
         return Response({"message": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
     
@@ -265,15 +295,29 @@ def rooms_by_hotel(request, hotel_id):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
+    username = request.data.get("username")
+    email = request.data.get("email")
+
+    if User.objects.filter(username=username).exists():
+        return Response(
+            {"username": ["This username already exists"]},
+            status=400
+        )
+    if User.objects.filter(email=email).exists():
+        return Response(
+            {"email": ["This email already exists"]},
+            status=400
+        )
+
     serializer = RegisterSerializer(data=request.data)
 
     if serializer.is_valid():
         user = serializer.save()
-        Profile.objects.create(
+        profile = Profile.objects.create(
             user=user,
             phone=request.data.get('phone'),
             country=request.data.get('country'))
-        create_log(user, "Created Profile", profile.id)
+        create_log(user, "Created Profile", user.email)
         return Response(
             serializer.data,
             status=status.HTTP_201_CREATED
@@ -326,11 +370,13 @@ def dashboard_stats(request):
     ).count()
 
     current_bookings = Booking.objects.filter(
-        check_in__lte=today,
         check_out__gt=today
     ).count()
 
-    current_guests = current_bookings
+    current_guests = Booking.objects.filter(
+        check_in__lte=today,
+        check_out__gt=today
+    ).count()
 
     departures_today = Booking.objects.filter(
         check_out=today
@@ -339,6 +385,19 @@ def dashboard_stats(request):
     arrivals = Booking.objects.filter(
         check_in__gt=today
     ).count()
+
+    room_type_bookings = []
+
+    for room_type in RoomType.objects.all():
+        count = Booking.objects.filter(
+            room__room_type=room_type,
+            check_out__gte=today
+        ).count()
+
+        room_type_bookings.append({
+            "room_type": room_type.name,
+            "count": count
+        })
 
     return Response({
         "total_room_types": total_room_types,
@@ -349,7 +408,49 @@ def dashboard_stats(request):
         "current_guests": current_guests,
         "departures_today": departures_today,
         "arrivals": arrivals,
+        "room_type_bookings": room_type_bookings,
     })
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def dashboard_card_settings(request):
+
+    settings = DashboardCardSetting.objects.all()
+
+    serializer = DashboardCardSettingSerializer(
+        settings,
+        many=True
+    )
+
+    return Response(serializer.data)
+
+@api_view(['PUT'])
+@permission_classes([IsAdminUser])
+def dashboard_card_setting_detail(request, pk):
+
+    try:
+        setting = DashboardCardSetting.objects.get(id=pk)
+
+    except DashboardCardSetting.DoesNotExist:
+        return Response(
+            {"error": "Setting not found"},
+            status=404
+        )
+
+    serializer = DashboardCardSettingSerializer(
+        setting,
+        data=request.data,
+        partial=True
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=400)
+
 
 
 @api_view(['GET'])
@@ -795,7 +896,8 @@ def gallery_image_detail(request, pk):
         return Response(serializer.errors, status=400)
 
     # DELETE
-    create_log(request.user if request.user.is_authenticated else None, "Deleted Gallery Image", f"Image {image.id} in Gallery {image.gallery.name}")
+    create_log(request.user if request.user.is_authenticated else None, "Deleted Gallery Image",
+                f"Image {image.id} from Gallery {image.gallery.title_en}")
 
     image.delete()
     return Response(status=204)
@@ -826,7 +928,8 @@ def reviews(request):
     serializer = ReviewSerializer(data=request.data)
 
     if serializer.is_valid():
-        serializer.save()
+        review = serializer.save()
+        create_notification("New Review",f"{review.name} added a review","review")
         create_log(request.user, "Created Review", serializer.data['id'])
         return Response(serializer.data, status=201)
 
@@ -1197,7 +1300,8 @@ def contact_messages(request):
     serializer = ContactMessageSerializer(data=request.data)
 
     if serializer.is_valid():
-        serializer.save()
+        message = serializer.save()
+        create_notification("New Contact Message",f"Message from {message.name}","contact")
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)

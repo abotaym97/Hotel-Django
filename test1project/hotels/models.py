@@ -58,7 +58,6 @@ class Booking(models.Model):
     guest_email = models.EmailField()
     guest_phone = models.CharField(max_length=20)
     guest_country = models.CharField(max_length=100)
-    # user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     user = models.ForeignKey(User , on_delete=models.SET_NULL,null=True, blank=True)
     room = models.ForeignKey(Room , on_delete=models.CASCADE)
     check_in = models.DateField()
@@ -76,7 +75,6 @@ class Booking(models.Model):
                 "NDH-" +
                 str(uuid.uuid4()).split("-")[0].upper()
             )
-
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -211,15 +209,12 @@ class ActivityLog(models.Model):
         null=True,
         blank=True
     )
-
     action = models.CharField(max_length=255)
-
     target = models.CharField(
         max_length=255,
         blank=True,
         null=True
     )
-
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -253,3 +248,39 @@ class ContactMessage(models.Model):
 
     def __str__(self):
         return self.subject
+    
+
+
+
+
+
+
+#Notification
+
+class Notification(models.Model):
+    TYPES = (
+        ("booking", "Booking"),
+        ("cancel", "Cancel"),
+        ("review", "Review"),
+        ("contact", "Contact"),
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    notification_type = models.CharField(max_length=20, choices=TYPES)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+
+
+
+#Dashboard
+class DashboardCardSetting(models.Model):
+    card_key = models.CharField(max_length=100, unique=True)
+    card_name = models.CharField(max_length=150)
+    is_visible = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.card_name
