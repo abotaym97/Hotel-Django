@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from .models import BookingSettings , ContactSetting , ContactMessage
 from datetime import timedelta
 from django.contrib.auth.models import User
-from .models import CustomerProfile,Notification,DashboardCardSetting
+from .models import CustomerProfile,Notification,DashboardCardSetting,SystemSetting
 from django.contrib.auth.models import User, Group
 
 
@@ -404,4 +404,13 @@ class ContactMessageSerializer(serializers.ModelSerializer):
 class DashboardCardSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = DashboardCardSetting
+        fields = "__all__"
+
+
+
+
+
+class SystemSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SystemSetting
         fields = "__all__"

@@ -19,12 +19,12 @@ from datetime import date
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .serializers import NearbyPlaceSerializer ,ContactMessageSerializer,ContactSettingSerializer, RestaurantSerializer , ServiceSerializer , GallerySerializer,ReviewSerializer
+from .serializers import NearbyPlaceSerializer ,ContactMessageSerializer,SystemSettingSerializer,ContactSettingSerializer, RestaurantSerializer , ServiceSerializer , GallerySerializer,ReviewSerializer
 from django.contrib.auth.models import User, Group
 from .serializers import StaffUserSerializer , NotificationSerializer ,DashboardCardSettingSerializer
 from django.contrib.auth.models import Group, Permission
 from django.utils.timezone import now
-from .models import ContactSetting ,ContactMessage,DashboardCardSetting
+from .models import ContactSetting ,ContactMessage,DashboardCardSetting,SystemSetting
 from .models import Notification
 
 
@@ -1326,3 +1326,27 @@ def contact_message_detail(request, pk):
     message.save()
 
     return Response({"message": "Updated successfully"})
+
+
+
+
+@api_view(["GET", "PUT"])
+@permission_classes([AllowAny])
+def system_settings(request):
+    setting, created = SystemSetting.objects.get_or_create(id=1)
+
+    if request.method == "GET":
+        serializer = SystemSettingSerializer(setting)
+        return Response(serializer.data)
+
+    serializer = SystemSettingSerializer(
+        setting,
+        data=request.data,
+        partial=True
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=400)

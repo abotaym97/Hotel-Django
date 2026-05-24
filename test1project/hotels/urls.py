@@ -56,4 +56,5 @@ urlpatterns = [
     path('notifications/<int:pk>/', views.notification_detail),
     path('dashboard-card-settings/',views.dashboard_card_settings),
     path('dashboard-card-settings/<int:pk>/',views.dashboard_card_setting_detail),
+    path("system-settings/", views.system_settings),
 ]

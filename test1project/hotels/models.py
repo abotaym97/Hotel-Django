@@ -284,3 +284,14 @@ class DashboardCardSetting(models.Model):
 
     def __str__(self):
         return self.card_name
+    
+
+
+#setting
+class SystemSetting(models.Model):
+    hero_image = models.ImageField(upload_to="system/", blank=True, null=True)
+    hero_title = models.CharField(max_length=255, blank=True)
+    hero_subtitle = models.TextField(blank=True)
+
+    def __str__(self):
+        return "System Settings"
