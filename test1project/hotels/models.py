@@ -292,6 +292,10 @@ class SystemSetting(models.Model):
     hero_image = models.ImageField(upload_to="system/", blank=True, null=True)
     hero_title = models.CharField(max_length=255, blank=True)
     hero_subtitle = models.TextField(blank=True)
+    contact_address = models.CharField(max_length=255, blank=True, null=True)
+    contact_phone = models.CharField(max_length=100, blank=True, null=True)
+    contact_email = models.EmailField(blank=True, null=True)
+    contact_work_time = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return "System Settings"

@@ -928,9 +928,8 @@ def reviews(request):
     serializer = ReviewSerializer(data=request.data)
 
     if serializer.is_valid():
-        review = serializer.save()
-        create_notification("New Review",f"{review.name} added a review","review")
-        create_log(request.user, "Created Review", serializer.data['id'])
+        serializer.save()
+        
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)
@@ -982,13 +981,11 @@ def review_detail(request, pk):
 @permission_classes([AllowAny])
 def submit_review(request):
     booking_code = request.data.get("booking_code")
-
     if not booking_code:
         return Response(
             {"error": "Booking code is required"},
             status=400
         )
-
     try:
         booking = Booking.objects.get(booking_code=booking_code)
     except Booking.DoesNotExist:
@@ -996,24 +993,28 @@ def submit_review(request):
             {"error": "Invalid booking code"},
             status=404
         )
-
     if booking.review_used:
         return Response(
             {"error": "This booking code has already been used for a review"},
             status=400
         )
+    
 
+    if Review.objects.filter(booking=booking).exists():
+        return Response(
+            {"error": "This booking code has already been used for a review"},
+            status=400
+        )
     serializer = ReviewSerializer(data=request.data)
-
     if serializer.is_valid():
-        serializer.save(
+        review = serializer.save(
             booking=booking,
             is_active=False
         )
-
+        create_notification("New Review",f"{review.name} added a review","review")
+        create_log(request.user if request.user.is_authenticated else None,"Created Review",f"{review.name} - {review.rating}/5")
         booking.review_used = True
         booking.save()
-
         return Response(
             {"message": "Review submitted and waiting for approval"},
             status=201
