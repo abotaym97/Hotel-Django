@@ -629,7 +629,7 @@ def bulk_room_availability(request):
         room.available_to = available_to
         room.status = status_value
         room.save()
-        create_log(request.user, "Updated Room Availability", room.name)
+        create_log(request.user, "Updated Room Availability", room.room_type)
 
     return Response({
         "message": f"{len(rooms)} rooms updated successfully"
