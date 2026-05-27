@@ -91,7 +91,8 @@ class BookingSerializer(serializers.ModelSerializer):
             'booking_code',
             'review_used',
             'adults',
-            'children'
+            'children',
+            'created_at',
         ]
         read_only_fields = ['user']
 

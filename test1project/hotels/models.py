@@ -296,6 +296,7 @@ class SystemSetting(models.Model):
     contact_phone = models.CharField(max_length=100, blank=True, null=True)
     contact_email = models.EmailField(blank=True, null=True)
     contact_work_time = models.CharField(max_length=100, blank=True, null=True)
-
+    story_image = models.ImageField(upload_to="system/" , blank=True, null=True)
+    story_description = models.TextField(blank=True)
     def __str__(self):
         return "System Settings"
