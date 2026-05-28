@@ -59,4 +59,8 @@ urlpatterns = [
     path("system-settings/", views.system_settings),
     path("admin-profiles/", views.admin_profiles),
     path("admin-profiles/<int:pk>/", views.admin_profile_detail),
+    path("customer-records/", views.customer_records),
+    path('rooms/<int:room_id>/bookings/',views.room_bookings),
+    path('rooms/<int:room_id>/availability/',views.room_availability),
+    path("rooms/bulk-off/", views.rooms_bulk_off),
 ]

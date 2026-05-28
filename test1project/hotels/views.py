@@ -30,9 +30,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import Profile
-from .serializers import (AdminProfileListSerializer,AdminProfileDetailSerializer,)
-
+from .models import Profile , CustomerProfile , CustomerRecord
+from .serializers import (AdminProfileListSerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
+from django.utils.timezone import now
+from datetime import timedelta
 
 
 
@@ -178,11 +179,33 @@ def bookings(request):
         serializer = BookingSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             booking = serializer.save()
+            CustomerRecord.objects.create(
+                name=booking.guest_name,
+                email=booking.guest_email,
+                phone=booking.guest_phone,
+                country=booking.guest_country
+            )
             create_notification("New Booking",f"New booking from {booking.user.email}","booking")
             create_log(request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def room_bookings(request, room_id):
+    today = date.today()
+
+    bookings = Booking.objects.filter(
+        room__id=room_id,
+        check_out__gte=today
+    ).order_by('check_in')
+
+    serializer = BookingSerializer(bookings, many=True)
+    return Response(serializer.data)
+
+
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -301,14 +324,8 @@ def rooms_by_hotel(request, hotel_id):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register(request):
-    username = request.data.get("username")
     email = request.data.get("email")
 
-    if User.objects.filter(username=username).exists():
-        return Response(
-            {"username": ["This username already exists"]},
-            status=400
-        )
     if User.objects.filter(email=email).exists():
         return Response(
             {"email": ["This email already exists"]},
@@ -642,6 +659,31 @@ def bulk_room_availability(request):
     })
 
 
+@api_view(["PUT"])
+@permission_classes([IsAdminUser])
+def rooms_bulk_off(request):
+    Room.objects.all().update(
+        status="OFF",
+        is_available=False
+    )
+
+    return Response({
+        "message": "All rooms are now not available"
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def room_availability(request, room_id):
+    try:
+        room = Room.objects.get(id=room_id)
+    except Room.DoesNotExist:
+        return Response({"error": "Room not found"}, status=404)
+
+    return Response({
+        "available_from": room.available_from,
+        "available_to": room.available_to,
+    })
 
 
 
@@ -1376,7 +1418,7 @@ def admin_profiles(request):
     return Response(serializer.data)
 
 
-@api_view(["GET", "PUT"])
+@api_view(["GET", "PUT", "DELETE"])
 @permission_classes([IsAdminUser])
 def admin_profile_detail(request, pk):
     try:
@@ -1392,14 +1434,30 @@ def admin_profile_detail(request, pk):
         serializer = AdminProfileDetailSerializer(profile)
         return Response(serializer.data)
 
-    serializer = AdminProfileDetailSerializer(
-        profile,
-        data=request.data,
-        partial=True
-    )
+    if request.method == "PUT":
+        serializer = AdminProfileDetailSerializer(profile, data=request.data, partial=True)
 
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
 
-    return Response(serializer.errors, status=400)
+        return Response(serializer.errors, status=400)
+
+    if request.method == "DELETE":
+        user = profile.user
+        profile.delete()
+        user.delete()
+        return Response({"message": "Profile deleted successfully"}, status=204)
+    
+
+
+
+
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def customer_records(request):
+    records = CustomerRecord.objects.all().order_by("-created_at")
+    serializer = CustomerRecordSerializer(records, many=True)
+    return Response(serializer.data)

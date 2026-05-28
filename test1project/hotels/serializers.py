@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from .models import BookingSettings , ContactSetting , ContactMessage
 from datetime import timedelta
 from django.contrib.auth.models import User
-from .models import CustomerProfile,Notification,DashboardCardSetting,SystemSetting
+from .models import CustomerProfile,Notification,DashboardCardSetting,SystemSetting , CustomerRecord
 from django.contrib.auth.models import User, Group
 
 
@@ -189,24 +189,31 @@ class BookingSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    full_name = serializers.CharField(write_only=True)
     phone = serializers.CharField(write_only=True)
     country = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'phone', 'country']
+        fields = ['full_name', 'email', 'password', 'phone', 'country']
+
         extra_kwargs = {
             'password': {'write_only': True}
         }
 
     def create(self, validated_data):
+
+        full_name = validated_data.pop('full_name')
         phone = validated_data.pop('phone')
         country = validated_data.pop('country')
 
+        email = validated_data.get('email')
+
         user = User.objects.create_user(
-            username=validated_data['email'],
-            email=validated_data['email'],
-            password=validated_data['password']
+            username=email,
+            email=email,
+            password=validated_data['password'],
+            first_name=full_name
         )
 
         CustomerProfile.objects.create(
@@ -523,3 +530,10 @@ class AdminProfileDetailSerializer(serializers.ModelSerializer):
 
     def get_total_bookings(self, obj):
         return Booking.objects.filter(user=obj.user).count()
+    
+
+
+class CustomerRecordSerializer(serializers.ModelSerializer):
+        class Meta:
+            model = CustomerRecord
+            fields = "__all__"
