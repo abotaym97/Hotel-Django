@@ -415,3 +415,111 @@ class SystemSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = SystemSetting
         fields = "__all__"
+
+
+
+
+
+#Customer Profiles
+from django.contrib.auth.models import User
+from rest_framework import serializers
+from .models import Profile, Booking
+
+
+class AdminProfileListSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="user.first_name", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    joined_at = serializers.DateTimeField(source="user.date_joined", read_only=True)
+    total_bookings = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Profile
+        fields = [
+            "id",
+            "user",
+            "username",
+            "name",
+            "email",
+            "phone",
+            "country",
+            "joined_at",
+            "total_bookings",
+        ]
+
+    def get_total_bookings(self, obj):
+        return Booking.objects.filter(user=obj.user).count()
+
+
+class AdminProfileBookingSerializer(serializers.ModelSerializer):
+    room_number = serializers.CharField(source="room.room_number", read_only=True)
+    room_type = serializers.CharField(source="room.room_type.name", read_only=True)
+
+    class Meta:
+        model = Booking
+        fields = [
+            "id",
+            "room_number",
+            "room_type",
+            "guest_name",
+            "guest_email",
+            "guest_phone",
+            "guest_country",
+            "check_in",
+            "check_out",
+            "created_at",
+            "booking_code",
+            "adults",
+            "children",
+        ]
+
+
+class AdminProfileDetailSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="user.first_name", required=False )
+    email = serializers.EmailField(source="user.email", required=False)
+    username = serializers.CharField(source="user.username", read_only=True)
+    joined_at = serializers.DateTimeField(source="user.date_joined", read_only=True)
+    bookings = serializers.SerializerMethodField()
+    total_bookings = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Profile
+        fields = [
+            "id",
+            "user",
+            "username",
+            "name",
+            "email",
+            "phone",
+            "country",
+            "joined_at",
+            "total_bookings",
+            "bookings",
+        ]
+        read_only_fields = ["user", "username", "joined_at", "total_bookings", "bookings"]
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop("user", {})
+
+        user = instance.user
+        if "first_name" in user_data:
+            user.first_name = user_data["first_name"]
+
+        if "email" in user_data:
+            user.email = user_data["email"]
+            user.username = user_data["email"]
+
+        user.save()
+
+        instance.phone = validated_data.get("phone", instance.phone)
+        instance.country = validated_data.get("country", instance.country)
+        instance.save()
+
+        return instance
+
+    def get_bookings(self, obj):
+        bookings = Booking.objects.filter(user=obj.user).order_by("-created_at")
+        return AdminProfileBookingSerializer(bookings, many=True).data
+
+    def get_total_bookings(self, obj):
+        return Booking.objects.filter(user=obj.user).count()

@@ -26,6 +26,12 @@ from django.contrib.auth.models import Group, Permission
 from django.utils.timezone import now
 from .models import ContactSetting ,ContactMessage,DashboardCardSetting,SystemSetting
 from .models import Notification
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAdminUser
+from rest_framework.response import Response
+from django.contrib.auth.models import User
+from .models import Profile
+from .serializers import (AdminProfileListSerializer,AdminProfileDetailSerializer,)
 
 
 
@@ -1342,6 +1348,52 @@ def system_settings(request):
 
     serializer = SystemSettingSerializer(
         setting,
+        data=request.data,
+        partial=True
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=400)
+
+
+
+
+#Customer Profiles
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def admin_profiles(request):
+    profiles = Profile.objects.filter(
+        user__is_staff=False,
+        user__is_superuser=False
+    ).select_related("user").order_by("-user__date_joined")
+
+    serializer = AdminProfileListSerializer(profiles, many=True)
+    return Response(serializer.data)
+
+
+@api_view(["GET", "PUT"])
+@permission_classes([IsAdminUser])
+def admin_profile_detail(request, pk):
+    try:
+        profile = Profile.objects.select_related("user").get(id=pk)
+
+        if profile.user.is_staff or profile.user.is_superuser:
+            return Response({"error": "This is not a customer profile"}, status=403)
+
+    except Profile.DoesNotExist:
+        return Response({"error": "Profile not found"}, status=404)
+
+    if request.method == "GET":
+        serializer = AdminProfileDetailSerializer(profile)
+        return Response(serializer.data)
+
+    serializer = AdminProfileDetailSerializer(
+        profile,
         data=request.data,
         partial=True
     )
