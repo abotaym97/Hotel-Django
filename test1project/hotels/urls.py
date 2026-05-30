@@ -70,4 +70,5 @@ urlpatterns = [
     path("meal-options/<int:meal_id>/toggle/",views.toggle_meal_option),
     path("currencies/", views.currencies),
     path("currencies/<int:pk>/", views.currency_detail),
+    path("bookings/<int:booking_id>/pay/",views.fake_payment),
 ]

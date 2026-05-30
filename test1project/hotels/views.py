@@ -1622,3 +1622,49 @@ def customer_records(request):
     records = CustomerRecord.objects.all().order_by("-created_at")
     serializer = CustomerRecordSerializer(records, many=True)
     return Response(serializer.data)
+
+
+
+
+
+
+
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def fake_payment(request, booking_id):
+
+    try:
+        booking = Booking.objects.get(id=booking_id)
+
+    except Booking.DoesNotExist:
+        return Response(
+            {"error": "Booking not found"},
+            status=404
+        )
+
+    card_number = request.data.get("card_number", "").replace(" ", "")
+
+    if card_number == "4242424242424242":
+
+        booking.payment_status = "paid"
+        booking.payment_method = "online"
+        booking.save()
+
+        return Response({
+            "message": "Payment successful",
+            "payment_status": booking.payment_status
+        })
+
+    booking.payment_status = "failed"
+    booking.payment_method = "online"
+    booking.save()
+
+    return Response(
+        {
+            "error": "Payment failed",
+            "payment_status": booking.payment_status
+        },
+        status=400
+    )
