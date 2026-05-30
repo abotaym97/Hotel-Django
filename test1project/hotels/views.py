@@ -21,20 +21,21 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .serializers import NearbyPlaceSerializer ,ContactMessageSerializer,SystemSettingSerializer,ContactSettingSerializer, RestaurantSerializer , ServiceSerializer , GallerySerializer,ReviewSerializer
 from django.contrib.auth.models import User, Group
-from .serializers import StaffUserSerializer , NotificationSerializer ,DashboardCardSettingSerializer
+from .serializers import StaffUserSerializer , CurrencySerializer, HotelSettingsSerializer, NotificationSerializer ,DashboardCardSettingSerializer , MealOptionSerializer
 from django.contrib.auth.models import Group, Permission
 from django.utils.timezone import now
-from .models import ContactSetting ,ContactMessage,DashboardCardSetting,SystemSetting
+from .models import ContactSetting,Currency ,ContactMessage,DashboardCardSetting,SystemSetting
 from .models import Notification
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import Profile , CustomerProfile , CustomerRecord
+from .models import Profile , CustomerProfile , CustomerRecord , MealOption ,HotelSettings
 from .serializers import (AdminProfileListSerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
 from django.utils.timezone import now
 from datetime import timedelta
-
+from decimal import Decimal
+from datetime import datetime
 
 
 
@@ -87,6 +88,56 @@ def get_hotels(request):
     hotels = Hotel.objects.all()
     serializer = HotelSerializer(hotels , many = True)
     return Response(serializer.data)
+
+
+
+@api_view(["GET", "POST"])
+def currencies(request):
+    # get
+    if request.method == "GET":
+        data = Currency.objects.all()
+        serializer = CurrencySerializer(data, many=True)
+        return Response(serializer.data)
+    
+
+    # post
+    if not request.user.is_staff:
+        return Response({"detail":"Unauthorized"} , status=403)
+
+
+    serializer = CurrencySerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        create_log(request.user, "Changed Currency", f"{Currency.name}")
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+@api_view(["PUT", "DELETE"])
+@permission_classes([IsAdminUser])
+def currency_detail(request, pk):
+    try:
+        currency = Currency.objects.get(id=pk)
+    except Currency.DoesNotExist:
+        return Response({"error": "Currency not found"}, status=404)
+
+    if request.method == "PUT":
+        if request.data.get("is_active") == True:
+            Currency.objects.all().update(is_active=False)
+
+        serializer = CurrencySerializer(currency, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=400)
+
+    currency.delete()
+    return Response(status=204)
+
+
 
 @api_view(['GET', 'POST'])
 def get_rooms(request):
@@ -164,6 +215,66 @@ def update_room(request, pk):
     return Response(serializer.errors, status=400)
 
 
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def meal_options(request):
+    options = MealOption.objects.filter(is_active=True)
+    serializer = MealOptionSerializer(options, many=True)
+    return Response(serializer.data)
+
+
+
+@api_view(["PUT", "DELETE"])
+@permission_classes([IsAdminUser])
+def admin_meal_option_detail(request, meal_id):
+    try:
+        meal = MealOption.objects.get(id=meal_id)
+    except MealOption.DoesNotExist:
+        return Response({"error": "Meal not found"}, status=404)
+
+    if request.method == "PUT":
+        serializer = MealOptionSerializer(meal, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    if request.method == "DELETE":
+        meal.delete()
+        return Response({"message": "Deleted"}, status=204)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAdminUser])
+def admin_meal_options(request):
+    if request.method == "GET":
+        options = MealOption.objects.all()
+        serializer = MealOptionSerializer(options, many=True)
+        return Response(serializer.data)
+
+    serializer = MealOptionSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+@api_view(["PUT"])
+@permission_classes([IsAdminUser])
+def toggle_meal_option(request, meal_id):
+
+    meal = MealOption.objects.get(id=meal_id)
+
+    meal.is_active = not meal.is_active
+
+    meal.save()
+
+    return Response({"success": True})
+
+
+
+
 @api_view(['GET' , 'POST'])
 @permission_classes([AllowAny])
 def bookings(request):
@@ -178,7 +289,37 @@ def bookings(request):
     if request.method == 'POST':
         serializer = BookingSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            booking = serializer.save()
+            meal_id = request.data.get("meal_option")
+            meal_price = 0
+
+            if meal_id:
+                meal = MealOption.objects.get(id=meal_id)
+                meal_price = meal.price
+
+            check_in = serializer.validated_data["check_in"]
+            check_out = serializer.validated_data["check_out"]
+            room = serializer.validated_data["room"]
+
+            nights = (check_out - check_in).days
+
+            room_price = room.room_type.price
+            meal_price = Decimal("0.00")
+
+            meal_id = request.data.get("meal_option")
+
+            if meal_id:
+                meal = MealOption.objects.get(id=meal_id)
+                meal_price = meal.price
+
+            total_price = (room_price * nights) + meal_price
+
+            booking = serializer.save(
+                user=request.user if request.user.is_authenticated else None,
+                meal_price=meal_price,
+                total_price=total_price,
+            )
+
+
             CustomerRecord.objects.create(
                 name=booking.guest_name,
                 email=booking.guest_email,
@@ -189,6 +330,26 @@ def bookings(request):
             create_log(request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(["PUT"])
+@permission_classes([IsAdminUser])
+def toggle_booking_read(request, booking_id):
+
+    try:
+        booking = Booking.objects.get(id=booking_id)
+    except Booking.DoesNotExist:
+        return Response(status=404)
+
+    booking.is_read = not booking.is_read
+    booking.save()
+
+    return Response({
+        "is_read": booking.is_read
+    })
+
+
 
 
 

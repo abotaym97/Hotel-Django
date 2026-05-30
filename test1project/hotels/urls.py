@@ -63,4 +63,11 @@ urlpatterns = [
     path('rooms/<int:room_id>/bookings/',views.room_bookings),
     path('rooms/<int:room_id>/availability/',views.room_availability),
     path("rooms/bulk-off/", views.rooms_bulk_off),
+    path("bookings/<int:booking_id>/toggle-read/",views.toggle_booking_read),
+    path("admin-meal-options/<int:meal_id>/", views.admin_meal_option_detail),
+    path("meal-options/", views.meal_options),
+    path("admin-meal-options/", views.admin_meal_options),
+    path("meal-options/<int:meal_id>/toggle/",views.toggle_meal_option),
+    path("currencies/", views.currencies),
+    path("currencies/<int:pk>/", views.currency_detail),
 ]

@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from .models import BookingSettings , ContactSetting , ContactMessage
 from datetime import timedelta
 from django.contrib.auth.models import User
-from .models import CustomerProfile,Notification,DashboardCardSetting,SystemSetting , CustomerRecord
+from .models import CustomerProfile, Currency,HotelSettings,Notification,DashboardCardSetting,SystemSetting , CustomerRecord,MealOption
 from django.contrib.auth.models import User, Group
 
 
@@ -23,6 +23,21 @@ class HotelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hotel
         fields = '__all__'
+
+
+class HotelSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HotelSettings
+        fields = "__all__"
+
+
+class CurrencySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Currency
+        fields = "__all__"
+
+
+
 
 class RoomSerializer(serializers.ModelSerializer):
     room_type_name = serializers.CharField(
@@ -65,6 +80,14 @@ class RoomSerializer(serializers.ModelSerializer):
         ]
 
 
+
+class MealOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MealOption
+        fields = "__all__"
+
+
+
 class BookingSerializer(serializers.ModelSerializer):
     room_number = serializers.CharField(source='room.room_number', read_only=True)
     room_type_display = serializers.CharField(source='room.room_type', read_only=True)
@@ -93,8 +116,14 @@ class BookingSerializer(serializers.ModelSerializer):
             'adults',
             'children',
             'created_at',
+            'is_read',
+            'meal_option',
+            'meal_price',
+            'payment_status',
+            'payment_method',
+            'total_price',
         ]
-        read_only_fields = ['user']
+        read_only_fields = ['user' , 'total_price', 'payment_status']
 
     def validate(self, data):
         room_type = data.get('room_type')

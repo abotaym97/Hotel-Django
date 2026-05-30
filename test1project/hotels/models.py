@@ -13,8 +13,16 @@ class Hotel(models.Model):
     def __str__(self):
         return self.name
     
+class HotelSettings(models.Model):
+    currency = models.CharField(max_length=10, default="$")
 
+class Currency(models.Model):
+    name = models.CharField(max_length=50)
+    symbol = models.CharField(max_length=10)
+    is_active = models.BooleanField(default=False)
 
+    def __str__(self):
+        return f"{self.name} {self.symbol}"
 
 #RoomType
 class RoomType(models.Model):
@@ -52,6 +60,18 @@ class Room(models.Model):
     def __str__(self):
         return f"Room {self.room_number} - {self.room_type.name}"
     
+
+
+class MealOption(models.Model):
+    name = models.CharField(max_length=100)  # Breakfast / Full Board
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+
+
 #Booking
 class Booking(models.Model):
     guest_name = models.CharField(max_length=100)
@@ -67,6 +87,12 @@ class Booking(models.Model):
     review_used = models.BooleanField(default=False)
     adults = models.PositiveIntegerField(default=1)
     children = models.PositiveIntegerField(default=0)
+    is_read = models.BooleanField(default=False)
+    meal_option = models.ForeignKey(MealOption,on_delete=models.SET_NULL,null=True,blank=True)
+    meal_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_status = models.CharField(max_length=20,choices=[("unpaid", "Unpaid"),("paid", "Paid"),("failed", "Failed"),("refunded", "Refunded"),],default="unpaid")
+    payment_method = models.CharField(max_length=50,choices=[("hotel", "Pay at Hotel"),("online", "Online Payment"),],default="hotel")
+    total_price = models.DecimalField(max_digits=10,decimal_places=2,default=0)
 
     def save(self, *args, **kwargs):
 
@@ -314,3 +340,9 @@ class CustomerRecord(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.email}"
+    
+
+
+
+
+
