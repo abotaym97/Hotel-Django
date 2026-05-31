@@ -295,11 +295,9 @@ def bookings(request):
             if meal_id:
                 meal = MealOption.objects.get(id=meal_id)
                 meal_price = meal.price
-
             check_in = serializer.validated_data["check_in"]
             check_out = serializer.validated_data["check_out"]
             room = serializer.validated_data["room"]
-
             nights = (check_out - check_in).days
 
             room_price = room.room_type.price
@@ -330,6 +328,51 @@ def bookings(request):
             create_log(request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
+
+
+@api_view(["PATCH"])
+@permission_classes([AllowAny])
+def update_booking_payment(request, booking_id):
+    try:
+        booking = Booking.objects.get(id=booking_id)
+
+        booking.payment_status = request.data.get(
+            "payment_status",
+            booking.payment_status
+        )
+
+        booking.save()
+
+        return Response({"message": "updated successfully"})
+
+    except Booking.DoesNotExist:
+        return Response(
+            {"error": "Booking not found"},
+            status=404
+        )
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def mark_all_bookings_read(request):
+
+    Booking.objects.filter(is_read=False).update(is_read=True)
+
+    return Response({
+        "message": "All bookings marked as read"
+    })
+
+
+
+
 
 
 
@@ -375,7 +418,7 @@ def available_rooms(request):
     check_out = request.GET.get('check_out')
     room_type = request.GET.get('room_type')
 
-    rooms = Room.objects.filter(is_available=True, status='ON')
+    rooms = Room.objects.filter(status='ON')
 
     if room_type:
         rooms = rooms.filter(room_type__name__iexact=room_type)

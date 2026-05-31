@@ -172,7 +172,7 @@ class BookingSerializer(serializers.ModelSerializer):
 
         available_room = Room.objects.filter(
             room_type__name__iexact=room_type,
-            is_available=True,
+            # is_available=True,
             available_from__lte=check_in,
             available_to__gte=check_out,
             status='ON'

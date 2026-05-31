@@ -324,6 +324,12 @@ class SystemSetting(models.Model):
     contact_work_time = models.CharField(max_length=100, blank=True, null=True)
     story_image = models.ImageField(upload_to="system/" , blank=True, null=True)
     story_description = models.TextField(blank=True)
+    show_payment_field = models.BooleanField(default=True)
+    allow_pay_at_hotel = models.BooleanField(default=True)
+    allow_online_payment = models.BooleanField(default=True)
+    default_payment_method = models.CharField(max_length=20,choices=[("hotel", "Pay at Hotel"),("online", "Online Payment"),],default="hotel")
+
+
     def __str__(self):
         return "System Settings"
     

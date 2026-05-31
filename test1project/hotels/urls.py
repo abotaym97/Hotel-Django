@@ -71,4 +71,9 @@ urlpatterns = [
     path("currencies/", views.currencies),
     path("currencies/<int:pk>/", views.currency_detail),
     path("bookings/<int:booking_id>/pay/",views.fake_payment),
+    path("bookings/<int:booking_id>/",views.update_booking_payment),
+    path(
+    "bookings/mark-all-read/",
+    views.mark_all_bookings_read
+),
 ]
