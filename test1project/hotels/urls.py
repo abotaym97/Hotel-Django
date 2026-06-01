@@ -70,10 +70,9 @@ urlpatterns = [
     path("meal-options/<int:meal_id>/toggle/",views.toggle_meal_option),
     path("currencies/", views.currencies),
     path("currencies/<int:pk>/", views.currency_detail),
+    path("bookings/<int:booking_id>/details/", views.booking_detail),
+    path("bookings/<int:booking_id>/notes/", views.update_booking_notes),
     path("bookings/<int:booking_id>/pay/",views.fake_payment),
     path("bookings/<int:booking_id>/",views.update_booking_payment),
-    path(
-    "bookings/mark-all-read/",
-    views.mark_all_bookings_read
-),
+    path("bookings/mark-all-read/",views.mark_all_bookings_read),
 ]

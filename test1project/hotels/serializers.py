@@ -96,6 +96,13 @@ class BookingSerializer(serializers.ModelSerializer):
         queryset=Room.objects.all(),
         required=False
 )
+    room_price = serializers.SerializerMethodField()
+
+    def get_room_price(self, obj):
+        return obj.room.room_type.price if obj.room and obj.room.room_type else 0
+
+
+
     class Meta:
         model = Booking
         fields = [
@@ -122,6 +129,8 @@ class BookingSerializer(serializers.ModelSerializer):
             'payment_status',
             'payment_method',
             'total_price',
+            "room_price",
+            "notes",
         ]
         read_only_fields = ['user' , 'total_price', 'payment_status']
 

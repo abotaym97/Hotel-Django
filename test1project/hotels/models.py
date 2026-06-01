@@ -93,6 +93,11 @@ class Booking(models.Model):
     payment_status = models.CharField(max_length=20,choices=[("unpaid", "Unpaid"),("paid", "Paid"),("failed", "Failed"),("refunded", "Refunded"),],default="unpaid")
     payment_method = models.CharField(max_length=50,choices=[("hotel", "Pay at Hotel"),("online", "Online Payment"),],default="hotel")
     total_price = models.DecimalField(max_digits=10,decimal_places=2,default=0)
+    notes = models.TextField(blank=True, null=True)
+
+
+
+
 
     def save(self, *args, **kwargs):
 

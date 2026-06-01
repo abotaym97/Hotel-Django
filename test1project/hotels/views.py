@@ -316,7 +316,11 @@ def bookings(request):
                 meal_price=meal_price,
                 total_price=total_price,
             )
-
+            if request.data.get("payment_method") == "online":
+                booking.payment_status = "paid"
+            else:
+                booking.payment_status = "unpaid"
+            booking.save()
 
             CustomerRecord.objects.create(
                 name=booking.guest_name,
@@ -328,9 +332,6 @@ def bookings(request):
             create_log(request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
 
 
 
@@ -358,6 +359,10 @@ def update_booking_payment(request, booking_id):
             {"error": "Booking not found"},
             status=404
         )
+
+
+
+
 
 
 @api_view(["PATCH"])
@@ -1711,3 +1716,24 @@ def fake_payment(request, booking_id):
         },
         status=400
     )
+
+
+
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def booking_detail(request, booking_id):
+    booking = Booking.objects.get(id=booking_id)
+    serializer = BookingSerializer(booking)
+    return Response(serializer.data)
+
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAdminUser])
+def update_booking_notes(request, booking_id):
+    booking = Booking.objects.get(id=booking_id)
+    booking.notes = request.data.get("notes", "")
+    booking.save()
+    return Response({"message": "Notes updated", "notes": booking.notes})
