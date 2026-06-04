@@ -24,6 +24,13 @@ class Currency(models.Model):
     def __str__(self):
         return f"{self.name} {self.symbol}"
 
+
+class Amenity(models.Model):
+    name = models.CharField(max_length=100)
+    icon = models.CharField(max_length=50)
+
+
+
 #RoomType
 class RoomType(models.Model):
     name = models.CharField(max_length=100)
@@ -31,9 +38,14 @@ class RoomType(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=8, decimal_places=2)
     capacity = models.IntegerField(default=1)
+    amenities = models.ManyToManyField(Amenity)
 
     def __str__(self):
         return self.name
+    
+
+
+
 #Room
 class Room(models.Model):
     hotel = models.ForeignKey(Hotel, on_delete=models.CASCADE)
@@ -357,3 +369,11 @@ class CustomerRecord(models.Model):
 
 
 
+class HeroSlide(models.Model):
+    image = models.ImageField(upload_to="hero_slides/")
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "id"]

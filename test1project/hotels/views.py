@@ -1,6 +1,6 @@
 from urllib import request
 
-from rest_framework.decorators import api_view , permission_classes
+from rest_framework.decorators import api_view, parser_classes , permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated , IsAdminUser , AllowAny
 from rest_framework import status
@@ -21,7 +21,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .serializers import NearbyPlaceSerializer ,ContactMessageSerializer,SystemSettingSerializer,ContactSettingSerializer, RestaurantSerializer , ServiceSerializer , GallerySerializer,ReviewSerializer
 from django.contrib.auth.models import User, Group
-from .serializers import StaffUserSerializer , CurrencySerializer, HotelSettingsSerializer, NotificationSerializer ,DashboardCardSettingSerializer , MealOptionSerializer
+from .serializers import StaffUserSerializer, HeroSlideSerializer , CurrencySerializer, HotelSettingsSerializer, NotificationSerializer ,DashboardCardSettingSerializer , MealOptionSerializer
 from django.contrib.auth.models import Group, Permission
 from django.utils.timezone import now
 from .models import ContactSetting,Currency ,ContactMessage,DashboardCardSetting,SystemSetting
@@ -30,14 +30,13 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import Profile , CustomerProfile , CustomerRecord , MealOption ,HotelSettings
-from .serializers import (AdminProfileListSerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
+from .models import Profile , CustomerProfile ,Amenity, CustomerRecord , MealOption ,HotelSettings , HeroSlide
+from .serializers import (AdminProfileListSerializer,AmenitySerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
 from django.utils.timezone import now
 from datetime import timedelta
 from decimal import Decimal
 from datetime import datetime
-
-
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 
@@ -1737,3 +1736,68 @@ def update_booking_notes(request, booking_id):
     booking.notes = request.data.get("notes", "")
     booking.save()
     return Response({"message": "Notes updated", "notes": booking.notes})
+
+
+
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def active_hero_slides(request):
+    slides = HeroSlide.objects.filter(is_active=True).order_by("order", "id")
+    serializer = HeroSlideSerializer(slides, many=True, context={"request": request})
+    return Response(serializer.data)
+
+
+
+@api_view(["GET", "POST"])
+@parser_classes([MultiPartParser, FormParser])
+def admin_hero_slides(request):
+    if request.method == "GET":
+        slides = HeroSlide.objects.all().order_by("order", "id")
+        serializer = HeroSlideSerializer(slides, many=True, context={"request": request})
+        return Response(serializer.data)
+
+    print("FILES:", request.FILES)
+    print("DATA:", request.data)
+
+    serializer = HeroSlideSerializer(data=request.data, context={"request": request})
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    print(serializer.errors)
+    return Response(serializer.errors, status=400)
+
+
+@api_view(["PUT", "PATCH", "DELETE"])
+@parser_classes([MultiPartParser, FormParser])
+def admin_hero_slide_detail(request, pk):
+    slide = get_object_or_404(HeroSlide, pk=pk)
+
+    if request.method == "DELETE":
+        slide.delete()
+        return Response(status=204)
+
+    serializer = HeroSlideSerializer(
+        slide,
+        data=request.data,
+        partial=True,
+        context={"request": request}
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=400)
+
+
+
+
+
+@api_view(["GET"])
+def amenities(request):
+    items = Amenity.objects.all()
+    serializer = AmenitySerializer(items, many=True)
+    return Response(serializer.data)

@@ -75,4 +75,9 @@ urlpatterns = [
     path("bookings/<int:booking_id>/pay/",views.fake_payment),
     path("bookings/<int:booking_id>/",views.update_booking_payment),
     path("bookings/mark-all-read/",views.mark_all_bookings_read),
+    path("hero-slides/", views.active_hero_slides),
+    path("admin-hero-slides/", views.admin_hero_slides),
+    path("admin-hero-slides/<int:pk>/", views.admin_hero_slide_detail),
+    path("amenities/", views.amenities),
+
 ]

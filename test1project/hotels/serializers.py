@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import ActivityLog, Gallery, GalleryImage, Hotel, NearbyPlace, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service
+from .models import ActivityLog, Gallery, GalleryImage, HeroSlide, Hotel, NearbyPlace, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service
 from django.contrib.auth.models import User
 from .models import BookingSettings , ContactSetting , ContactMessage
 from datetime import timedelta
 from django.contrib.auth.models import User
-from .models import CustomerProfile, Currency,HotelSettings,Notification,DashboardCardSetting,SystemSetting , CustomerRecord,MealOption
+from .models import CustomerProfile,Amenity, Currency,HotelSettings,Notification,DashboardCardSetting,SystemSetting , CustomerRecord,MealOption
 from django.contrib.auth.models import User, Group
 
 
@@ -288,14 +288,7 @@ class RoomTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RoomType
-        fields = [
-            'id',
-            'name',
-            'image',
-            'description',
-            'price',
-            'capacity',
-        ]
+        fields = "__all__"
 
 
 #restaurant
@@ -575,3 +568,37 @@ class CustomerRecordSerializer(serializers.ModelSerializer):
         class Meta:
             model = CustomerRecord
             fields = "__all__"
+
+
+
+
+class HeroSlideSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HeroSlide
+        fields = [
+            "id",
+            "image",
+            "image_url",
+            "order",
+            "is_active",
+            "created_at",
+        ]
+
+    def get_image_url(self, obj):
+        request = self.context.get("request")
+
+        if obj.image:
+            return request.build_absolute_uri(obj.image.url)
+
+        return None
+    
+
+
+
+
+class AmenitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Amenity
+        fields = "__all__"
