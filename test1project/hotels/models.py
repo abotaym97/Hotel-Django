@@ -27,7 +27,7 @@ class Currency(models.Model):
 
 class Amenity(models.Model):
     name = models.CharField(max_length=100)
-    icon = models.CharField(max_length=50)
+    icon = models.ImageField(upload_to="amenities/" , blank=True , null=True)
 
 
 
@@ -39,6 +39,18 @@ class RoomType(models.Model):
     price = models.DecimalField(max_digits=8, decimal_places=2)
     capacity = models.IntegerField(default=1)
     amenities = models.ManyToManyField(Amenity)
+    # Check In
+    check_in_1 = models.CharField(max_length=255, blank=True)
+    check_in_2 = models.CharField(max_length=255, blank=True)
+    check_in_3 = models.CharField(max_length=255, blank=True)
+
+    # Check Out
+    check_out_1 = models.CharField(max_length=255, blank=True)
+    check_out_2 = models.CharField(max_length=255, blank=True)
+    check_out_3 = models.CharField(max_length=255, blank=True)
+
+    # Extra Bed
+    extra_bed_info = models.TextField(blank=True)
 
     def __str__(self):
         return self.name
