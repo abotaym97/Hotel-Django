@@ -684,6 +684,11 @@ def dashboard_card_setting_detail(request, pk):
 
 
 
+
+
+
+
+
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def all_bookings(request):
@@ -1801,3 +1806,34 @@ def amenities(request):
     items = Amenity.objects.all()
     serializer = AmenitySerializer(items, many=True)
     return Response(serializer.data)
+
+
+
+@api_view(["GET"])
+def dashboard_occupancy(request):
+    start_date = request.GET.get("start_date")
+    days = int(request.GET.get("days", 8))
+
+    start = datetime.strptime(start_date, "%Y-%m-%d").date()
+
+    total_rooms = Room.objects.count()
+    result = []
+
+    for i in range(days):
+        day = start + timedelta(days=i)
+
+        occupied = Booking.objects.filter(
+            check_in__lte=day,
+            check_out__gt=day
+        ).values("room").distinct().count()
+
+        result.append({
+            "date": day,
+            "occupied": occupied,
+            "available": total_rooms - occupied,
+        })
+
+    return Response({
+        "total_rooms": total_rooms,
+        "days": result,
+    })

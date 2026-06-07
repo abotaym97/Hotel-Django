@@ -1,6 +1,6 @@
 from . import views
 from django.urls import path
-from .views import booking_settings,notification_detail,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
+from .views import booking_settings,dashboard_occupancy,notification_detail,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
 
 
 urlpatterns = [
@@ -79,5 +79,6 @@ urlpatterns = [
     path("admin-hero-slides/", views.admin_hero_slides),
     path("admin-hero-slides/<int:pk>/", views.admin_hero_slide_detail),
     path("amenities/", views.amenities),
+    path("dashboard/occupancy/", dashboard_occupancy),
 
 ]
