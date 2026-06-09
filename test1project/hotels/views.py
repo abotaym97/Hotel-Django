@@ -30,8 +30,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import Profile , CustomerProfile ,Amenity, CustomerRecord , MealOption ,HotelSettings , HeroSlide
-from .serializers import (AdminProfileListSerializer,AmenitySerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
+from .models import Profile ,UserTableSetting, CustomerProfile ,Amenity, CustomerRecord , MealOption ,HotelSettings , HeroSlide
+from .serializers import (AdminProfileListSerializer,UserTableSettingSerializer,AmenitySerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
 from django.utils.timezone import now
 from datetime import timedelta
 from decimal import Decimal
@@ -1813,9 +1813,7 @@ def amenities(request):
 def dashboard_occupancy(request):
     start_date = request.GET.get("start_date")
     days = int(request.GET.get("days", 8))
-
     start = datetime.strptime(start_date, "%Y-%m-%d").date()
-
     total_rooms = Room.objects.count()
     result = []
 
@@ -1837,3 +1835,28 @@ def dashboard_occupancy(request):
         "total_rooms": total_rooms,
         "days": result,
     })
+
+
+
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([IsAuthenticated])
+def user_table_setting(request, table_name):
+    setting, created = UserTableSetting.objects.get_or_create(
+        user=request.user,
+        table_name=table_name,
+        defaults={"visible_columns": {}}
+    )
+
+    if request.method == "GET":
+        serializer = UserTableSettingSerializer(setting)
+        return Response(serializer.data)
+
+    if request.method == "PATCH":
+        visible_columns = request.data.get("visible_columns", {})
+        setting.visible_columns = visible_columns
+        setting.save()
+
+        serializer = UserTableSettingSerializer(setting)
+        return Response(serializer.data)

@@ -80,5 +80,5 @@ urlpatterns = [
     path("admin-hero-slides/<int:pk>/", views.admin_hero_slide_detail),
     path("amenities/", views.amenities),
     path("dashboard/occupancy/", dashboard_occupancy),
-
+    path("table-settings/<str:table_name>/",views.user_table_setting,name="user-table-setting"),
 ]

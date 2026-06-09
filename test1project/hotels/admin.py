@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ActivityLog,Amenity, HeroSlide,MealOption,SystemSetting,DashboardCardSetting,Notification,ContactSetting,ContactMessage, CustomerProfile, Hotel, Restaurant, Review ,  Room ,  Booking, RoomType , NearbyPlace, Service , Gallery ,BookingSettings ,Profile ,GalleryImage
+from .models import ActivityLog,Amenity,UserTableSetting, HeroSlide,MealOption,SystemSetting,DashboardCardSetting,Notification,ContactSetting,ContactMessage, CustomerProfile, Hotel, Restaurant, Review ,  Room ,  Booking, RoomType , NearbyPlace, Service , Gallery ,BookingSettings ,Profile ,GalleryImage
 
 
 admin.site.register(Hotel)
@@ -22,6 +22,7 @@ admin.site.register(SystemSetting)
 admin.site.register(MealOption)
 admin.site.register(HeroSlide)
 admin.site.register(Amenity)
+admin.site.register(UserTableSetting)
 
 
 

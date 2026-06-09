@@ -389,3 +389,16 @@ class HeroSlide(models.Model):
 
     class Meta:
         ordering = ["order", "id"]
+
+
+
+class UserTableSetting(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    table_name = models.CharField(max_length=100)
+    visible_columns = models.JSONField(default=dict)
+
+    class Meta:
+        unique_together = ("user", "table_name")
+
+    def __str__(self):
+        return f"{self.user} - {self.table_name}"

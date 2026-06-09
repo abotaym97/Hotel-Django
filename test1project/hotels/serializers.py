@@ -602,3 +602,14 @@ class AmenitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Amenity
         fields = "__all__"
+
+
+
+
+
+from .models import UserTableSetting
+
+class UserTableSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserTableSetting
+        fields = ["id", "table_name", "visible_columns"]
