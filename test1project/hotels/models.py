@@ -149,6 +149,11 @@ class BookingSettings(models.Model):
     
 
 
+class AutoCloseSetting(models.Model):
+    auto_close_booked_room = models.BooleanField(default=False)
+    
+
+
 
 class CustomerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)

@@ -30,7 +30,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import Profile ,UserTableSetting, CustomerProfile ,Amenity, CustomerRecord , MealOption ,HotelSettings , HeroSlide
+from .models import Profile ,AutoCloseSetting,UserTableSetting, CustomerProfile ,Amenity, CustomerRecord , MealOption ,HotelSettings , HeroSlide
 from .serializers import (AdminProfileListSerializer,UserTableSettingSerializer,AmenitySerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
 from django.utils.timezone import now
 from datetime import timedelta
@@ -329,7 +329,13 @@ def bookings(request):
             )
             create_notification("New Booking",f"New booking from {booking.user.email}","booking")
             create_log(request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            setting = AutoCloseSetting.objects.first()
+
+            if setting and setting.auto_close_booked_room:
+                if booking.room:
+                    booking.room.status = "OFF"
+                    booking.room.save()
+            return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -588,15 +594,24 @@ def booking_settings(request):
 def dashboard_stats(request):
     today = date.today()
 
+    booked_room_ids = Booking.objects.filter(
+        check_out__gt=today
+        ).values_list("room_id", flat=True)
+    
+    booked_rooms = booked_room_ids.distinct().count()
+
     total_room_types = RoomType.objects.count()
     total_rooms = Room.objects.count()
 
     available_rooms = Room.objects.filter(
-        is_available=True,
+        # is_available=True,
         status='ON'
+    ).exclude(
+    id__in=booked_room_ids
     ).count()
 
     unavailable_rooms = Room.objects.filter(
+
         status='OFF'
     ).count()
 
@@ -640,6 +655,7 @@ def dashboard_stats(request):
         "departures_today": departures_today,
         "arrivals": arrivals,
         "room_type_bookings": room_type_bookings,
+        "booked_rooms": booked_rooms,
     })
 
 
@@ -1860,3 +1876,28 @@ def user_table_setting(request, table_name):
 
         serializer = UserTableSettingSerializer(setting)
         return Response(serializer.data)
+    
+
+
+
+
+# اعداد التغيير التلقائي لحالة الغرفة
+@api_view(["GET", "PUT"])
+@permission_classes([IsAuthenticated])
+def auto_close_setting(request):
+    setting, created = AutoCloseSetting.objects.get_or_create(id=1)
+
+    if request.method == "GET":
+        return Response({
+            "auto_close_booked_room": setting.auto_close_booked_room
+        })
+
+    setting.auto_close_booked_room = request.data.get(
+        "auto_close_booked_room",
+        setting.auto_close_booked_room
+    )
+    setting.save()
+
+    return Response({
+        "auto_close_booked_room": setting.auto_close_booked_room
+    })
