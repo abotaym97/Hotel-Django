@@ -25,7 +25,7 @@ from .serializers import StaffUserSerializer, HeroSlideSerializer , CurrencySeri
 from django.contrib.auth.models import Group, Permission
 from django.utils.timezone import now
 from .models import ContactSetting,Currency ,ContactMessage,DashboardCardSetting,SystemSetting
-from .models import Notification
+from .models import Notification ,SiteSetting
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
@@ -1900,4 +1900,29 @@ def auto_close_setting(request):
 
     return Response({
         "auto_close_booked_room": setting.auto_close_booked_room
+    })
+
+
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def site_status(request):
+    setting, created = SiteSetting.objects.get_or_create(id=1)
+
+    return Response({
+        "maintenance_mode": setting.maintenance_mode
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def toggle_maintenance(request):
+    setting, created = SiteSetting.objects.get_or_create(id=1)
+
+    setting.maintenance_mode = not setting.maintenance_mode
+    setting.save()
+
+    return Response({
+        "maintenance_mode": setting.maintenance_mode
     })

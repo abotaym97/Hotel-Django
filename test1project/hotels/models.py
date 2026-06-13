@@ -407,3 +407,12 @@ class UserTableSetting(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.table_name}"
+    
+
+
+
+class SiteSetting(models.Model):
+    maintenance_mode = models.BooleanField(default=False)
+
+    def __str__(self):
+        return "Site Settings"

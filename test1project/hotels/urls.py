@@ -1,6 +1,6 @@
 from . import views
 from django.urls import path
-from .views import booking_settings,auto_close_setting,dashboard_occupancy,notification_detail,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
+from .views import booking_settings,toggle_maintenance,site_status,auto_close_setting,dashboard_occupancy,notification_detail,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
 
 
 urlpatterns = [
@@ -82,4 +82,6 @@ urlpatterns = [
     path("dashboard/occupancy/", dashboard_occupancy),
     path("table-settings/<str:table_name>/",views.user_table_setting,name="user-table-setting"),
     path("dashboard/settings/", auto_close_setting),
+    path("site/status/", site_status),
+    path("site/toggle-maintenance/", toggle_maintenance),
 ]
