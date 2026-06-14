@@ -178,13 +178,20 @@ class Profile(models.Model):
 #restaurant
 class Restaurant(models.Model):
     name = models.CharField(max_length=100)
+    name_ar = models.CharField(max_length=100)
     image = models.ImageField(upload_to='restaurants/')
     category = models.CharField(max_length=100, blank=True)
+    category_ar = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
+    description_ar = models.TextField(blank=True)
     price_info = models.TextField(blank=True)
+    price_info_ar = models.TextField(blank=True)
     breakfast_time = models.CharField(max_length=100, blank=True)
+    breakfast_time_ar = models.CharField(max_length=100, blank=True)
     lunch_time = models.CharField(max_length=100, blank=True)
+    lunch_time_ar = models.CharField(max_length=100, blank=True)
     dinner_time = models.CharField(max_length=100, blank=True)
+    dinner_time_ar = models.CharField(max_length=100, blank=True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):

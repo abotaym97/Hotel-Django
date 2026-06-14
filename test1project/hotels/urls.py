@@ -1,6 +1,6 @@
 from . import views
 from django.urls import path
-from .views import booking_settings,toggle_maintenance,site_status,auto_close_setting,dashboard_occupancy,notification_detail,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
+from .views import booking_settings,admin_restaurants,toggle_maintenance,site_status,auto_close_setting,dashboard_occupancy,notification_detail,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
 
 
 urlpatterns = [
@@ -30,6 +30,7 @@ urlpatterns = [
     path('room-types/<int:pk>/rooms/', views.rooms_by_type),
     path('rooms/bulk-availability/', views.bulk_room_availability),
     path('restaurants/', views.restaurants),
+    path("admin/restaurants/", views.admin_restaurants),
     path('restaurants/<int:pk>/', views.restaurant_detail),
     path('restaurants/<int:pk>/', views.restaurant_detail),
     path('nearby-places/', views.nearby_places),

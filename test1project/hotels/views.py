@@ -935,6 +935,13 @@ def restaurants(request):
     return Response(serializer.errors, status=400)
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_restaurants(request):
+    restaurants = Restaurant.objects.all().order_by("-id")
+    serializer = RestaurantSerializer(restaurants, many=True)
+    return Response(serializer.data)
+
 
 
 
