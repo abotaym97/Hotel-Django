@@ -1000,6 +1000,21 @@ def nearby_places(request):
 
     return Response(serializer.errors, status=400)
 
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_nearby_places(request):
+    nearby_places = NearbyPlace.objects.all().order_by("-id")
+    serializer = NearbyPlaceSerializer(nearby_places, many=True)
+    return Response(serializer.data)
+
+
+
+
+
+
+
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def nearby_place_detail(request, pk):
@@ -1027,7 +1042,7 @@ def nearby_place_detail(request, pk):
         return Response(serializer.errors, status=400)
 
     if request.method == 'DELETE':
-        create_log(request.user, "Deleted Nearby Place", place.name)
+        create_log(request.user, "Deleted Nearby Place", place.name_en)
         place.delete()
         
         return Response(status=204)
@@ -1052,6 +1067,17 @@ def services(request):
     return Response(serializer.errors, status=400)
 
 
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_services(request):
+    services = Service.objects.all().order_by("-id")
+    serializer = ServiceSerializer(services, many=True)
+    return Response(serializer.data)
+
+
+
+
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def service_detail(request, pk):
@@ -1073,7 +1099,7 @@ def service_detail(request, pk):
         return Response(serializer.errors, status=400)
 
     if request.method == 'DELETE':
-        create_log(request.user, "Deleted Service", service.name)
+        create_log(request.user, "Deleted Service", service.title)
         service.delete()
         return Response(status=204)
     
