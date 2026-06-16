@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import ActivityLog, Gallery, GalleryImage, HeroSlide, Hotel, NearbyPlace, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service
 from django.contrib.auth.models import User
-from .models import BookingSettings , ContactSetting , ContactMessage
+from .models import BookingSettings ,Facility, ContactSetting , ContactMessage
 from datetime import timedelta
 from django.contrib.auth.models import User
 from .models import CustomerProfile,Amenity, Currency,HotelSettings,Notification,DashboardCardSetting,SystemSetting , CustomerRecord,MealOption
@@ -613,3 +613,12 @@ class UserTableSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserTableSetting
         fields = ["id", "table_name", "visible_columns"]
+
+
+
+
+
+class FacilitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Facility
+        fields = "__all__"

@@ -30,8 +30,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import Profile ,AutoCloseSetting,UserTableSetting, CustomerProfile ,Amenity, CustomerRecord , MealOption ,HotelSettings , HeroSlide
-from .serializers import (AdminProfileListSerializer,UserTableSettingSerializer,AmenitySerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
+from .models import Profile ,Facility,AutoCloseSetting,UserTableSetting, CustomerProfile ,Amenity, CustomerRecord , MealOption ,HotelSettings , HeroSlide
+from .serializers import (AdminProfileListSerializer,FacilitySerializer,UserTableSettingSerializer,AmenitySerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
 from django.utils.timezone import now
 from datetime import timedelta
 from decimal import Decimal
@@ -987,8 +987,8 @@ def restaurant_detail(request, pk):
 def nearby_places(request):
 
     if request.method == 'GET':
-        places = NearbyPlace.objects.filter(is_active=True)
-        serializer = NearbyPlaceSerializer(places, many=True)
+        places = NearbyPlace.objects.filter(is_active=True).order_by("order" , "id")
+        serializer = NearbyPlaceSerializer(places, many=True , context={"request": request})
         return Response(serializer.data)
 
     serializer = NearbyPlaceSerializer(data=request.data)
@@ -1959,3 +1959,63 @@ def toggle_maintenance(request):
     return Response({
         "maintenance_mode": setting.maintenance_mode
     })
+
+
+
+
+
+
+
+
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def facilities(request):
+    items = Facility.objects.filter(is_active=True).order_by("order", "id")
+    serializer = FacilitySerializer(items, many=True)
+    return Response(serializer.data)
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def admin_facilities(request):
+    if request.method == "GET":
+        items = Facility.objects.all().order_by("order", "id")
+        serializer = FacilitySerializer(items, many=True)
+        return Response(serializer.data)
+
+    serializer = FacilitySerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+    return Response(serializer.errors, status=400)
+
+
+@api_view(["GET", "PUT", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def admin_facility_detail(request, pk):
+    facility = get_object_or_404(Facility, pk=pk)
+
+    if request.method == "GET":
+        serializer = FacilitySerializer(facility)
+        return Response(serializer.data)
+
+    if request.method == "DELETE":
+        facility.delete()
+        return Response({"message": "Deleted successfully"})
+
+    serializer = FacilitySerializer(
+        facility,
+        data=request.data,
+        partial=True
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=400)

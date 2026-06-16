@@ -87,4 +87,7 @@ urlpatterns = [
     path("dashboard/settings/", auto_close_setting),
     path("site/status/", site_status),
     path("site/toggle-maintenance/", toggle_maintenance),
+    path("facilities/", views.facilities),
+path("admin/facilities/", views.admin_facilities),
+path("admin/facilities/<int:pk>/", views.admin_facility_detail),
 ]

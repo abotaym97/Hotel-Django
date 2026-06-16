@@ -204,11 +204,16 @@ class Restaurant(models.Model):
 class NearbyPlace(models.Model):
     name_ar = models.CharField(max_length=150)
     name_en = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
     image = models.ImageField(upload_to='nearby_places/')
     location = models.CharField(max_length=255)
     distance = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order" , "id"]
 
     def __str__(self):
         return self.name_en
@@ -423,3 +428,19 @@ class SiteSetting(models.Model):
 
     def __str__(self):
         return "Site Settings"
+    
+
+
+
+class Facility(models.Model):
+    title = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    image = models.ImageField(upload_to="facilities/", blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return self.title
