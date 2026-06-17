@@ -435,12 +435,12 @@ class SiteSetting(models.Model):
 class Facility(models.Model):
     title = models.CharField(max_length=150)
     description = models.TextField(blank=True)
-    image = models.ImageField(upload_to="facilities/", blank=True, null=True)
+    icon = models.CharField(max_length=100 , blank=True)
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["order", "id"]
+        ordering = ["order"]
 
     def __str__(self):
         return self.title
