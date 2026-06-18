@@ -6,6 +6,7 @@ from datetime import timedelta
 from django.contrib.auth.models import User
 from .models import CustomerProfile,Amenity, Currency,HotelSettings,Notification,DashboardCardSetting,SystemSetting , CustomerRecord,MealOption
 from django.contrib.auth.models import User, Group
+from .models import PolicySetting,SocialMediaSetting
 
 
 
@@ -621,4 +622,22 @@ class UserTableSettingSerializer(serializers.ModelSerializer):
 class FacilitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Facility
+        fields = "__all__"
+
+
+
+
+
+
+
+class PolicySettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PolicySetting
+        fields = "__all__"
+
+
+
+class SocialMediaSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SocialMediaSetting
         fields = "__all__"

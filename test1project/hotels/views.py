@@ -30,13 +30,14 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from django.contrib.auth.models import User
-from .models import Profile ,Facility,AutoCloseSetting,UserTableSetting, CustomerProfile ,Amenity, CustomerRecord , MealOption ,HotelSettings , HeroSlide
-from .serializers import (AdminProfileListSerializer,FacilitySerializer,UserTableSettingSerializer,AmenitySerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
+from .models import Profile ,SocialMediaSetting,PolicySetting,Facility,AutoCloseSetting,UserTableSetting, CustomerProfile ,Amenity, CustomerRecord , MealOption ,HotelSettings , HeroSlide
+from .serializers import (AdminProfileListSerializer,SocialMediaSettingSerializer,PolicySettingSerializer,FacilitySerializer,UserTableSettingSerializer,AmenitySerializer,AdminProfileDetailSerializer,CustomerRecordSerializer)
 from django.utils.timezone import now
 from datetime import timedelta
 from decimal import Decimal
 from datetime import datetime
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import viewsets
 
 
 
@@ -2010,6 +2011,71 @@ def admin_facility_detail(request, pk):
 
     serializer = FacilitySerializer(
         facility,
+        data=request.data,
+        partial=True
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=400)
+
+
+
+
+
+
+
+
+
+@api_view(["GET", "PUT"])
+@permission_classes([IsAuthenticated])
+def policy_settings(request):
+    setting, created = PolicySetting.objects.get_or_create(id=1)
+
+    if request.method == "GET":
+        serializer = PolicySettingSerializer(setting)
+        return Response(serializer.data)
+
+    serializer = PolicySettingSerializer(setting, data=request.data, partial=True)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=400)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_policy_settings(request):
+    setting, created = PolicySetting.objects.get_or_create(id=1)
+    serializer = PolicySettingSerializer(setting)
+    return Response(serializer.data)
+
+
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_social_settings(request):
+    setting, created = SocialMediaSetting.objects.get_or_create(id=1)
+    serializer = SocialMediaSettingSerializer(setting)
+    return Response(serializer.data)
+
+
+@api_view(["GET", "PUT"])
+@permission_classes([IsAuthenticated])
+def social_settings(request):
+    setting, created = SocialMediaSetting.objects.get_or_create(id=1)
+
+    if request.method == "GET":
+        serializer = SocialMediaSettingSerializer(setting)
+        return Response(serializer.data)
+
+    serializer = SocialMediaSettingSerializer(
+        setting,
         data=request.data,
         partial=True
     )

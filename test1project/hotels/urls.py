@@ -88,6 +88,11 @@ urlpatterns = [
     path("site/status/", site_status),
     path("site/toggle-maintenance/", toggle_maintenance),
     path("facilities/", views.facilities),
-path("admin/facilities/", views.admin_facilities),
-path("admin/facilities/<int:pk>/", views.admin_facility_detail),
+    path("admin/facilities/", views.admin_facilities),
+    path("admin/facilities/<int:pk>/", views.admin_facility_detail),
+    path("policy-settings/", views.public_policy_settings),
+    path("admin/policy-settings/", views.policy_settings),
+    path("social-settings/", views.public_social_settings),
+    path("admin/social-settings/", views.social_settings),
 ]
+

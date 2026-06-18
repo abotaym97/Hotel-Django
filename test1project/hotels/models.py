@@ -444,3 +444,34 @@ class Facility(models.Model):
 
     def __str__(self):
         return self.title
+
+
+
+
+
+class PolicySetting(models.Model):
+    privacy_policy = models.JSONField(default=list, blank=True)
+    cancellation_policy = models.JSONField(default=list, blank=True)
+    terms_conditions = models.JSONField(default=list, blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return "Policy Settings"
+    
+
+
+
+class SocialMediaSetting(models.Model):
+    facebook = models.URLField(blank=True)
+    instagram = models.URLField(blank=True)
+    twitter = models.URLField(blank=True)
+    linkedin = models.URLField(blank=True)
+    youtube = models.URLField(blank=True)
+    tiktok = models.URLField(blank=True)
+    whatsapp = models.CharField(max_length=50, blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return "Social Media Settings"
