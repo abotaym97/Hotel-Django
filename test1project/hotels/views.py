@@ -37,7 +37,6 @@ from datetime import timedelta
 from decimal import Decimal
 from datetime import datetime
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework import viewsets
 
 
 
@@ -69,6 +68,7 @@ def create_log(user, action, target=""):
 
 
 @api_view(["GET"])
+@permission_classes([IsAdminUser])
 def notifications(request):
     notifications = Notification.objects.all().order_by("-created_at")
     serializer = NotificationSerializer(notifications, many=True)
@@ -84,6 +84,7 @@ def notification_detail(request, pk):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def get_hotels(request):
     hotels = Hotel.objects.all()
     serializer = HotelSerializer(hotels , many = True)
@@ -92,6 +93,7 @@ def get_hotels(request):
 
 
 @api_view(["GET", "POST"])
+@permission_classes([AllowAny])
 def currencies(request):
     # get
     if request.method == "GET":
@@ -99,19 +101,14 @@ def currencies(request):
         serializer = CurrencySerializer(data, many=True)
         return Response(serializer.data)
     
-
     # post
     if not request.user.is_staff:
         return Response({"detail":"Unauthorized"} , status=403)
-
-
     serializer = CurrencySerializer(data=request.data)
-
     if serializer.is_valid():
         serializer.save()
-        create_log(request.user, "Changed Currency", f"{Currency.name}")
+        create_log(request.user, "Changed Currency", Currency.name)
         return Response(serializer.data, status=201)
-
     return Response(serializer.errors, status=400)
 
 @api_view(["PUT", "DELETE"])
@@ -121,31 +118,27 @@ def currency_detail(request, pk):
         currency = Currency.objects.get(id=pk)
     except Currency.DoesNotExist:
         return Response({"error": "Currency not found"}, status=404)
-
     if request.method == "PUT":
         if request.data.get("is_active") == True:
             Currency.objects.all().update(is_active=False)
-
         serializer = CurrencySerializer(currency, data=request.data, partial=True)
-
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-
         return Response(serializer.errors, status=400)
-
     currency.delete()
     return Response(status=204)
 
 
 
 @api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
 def get_rooms(request):
     if request.method == 'GET':
         rooms = Room.objects.all()
         serializer = RoomSerializer(rooms, many=True)
         return Response(serializer.data)
-
+# post
     if request.method == 'POST':
         serializer = RoomSerializer(data=request.data)
 
@@ -159,6 +152,7 @@ def get_rooms(request):
 
 
 @api_view(['DELETE'])
+@permission_classes([IsAdminUser])
 def delete_room(request, pk):
 
     try:
@@ -186,6 +180,7 @@ def delete_room(request, pk):
 
 
 @api_view(['PUT', 'PATCH'])
+@permission_classes([IsAdminUser])
 def update_room(request, pk):
 
     try:
@@ -279,6 +274,10 @@ def toggle_meal_option(request, meal_id):
 @permission_classes([AllowAny])
 def bookings(request):
     if request.method == 'GET':
+
+        if not request.user.is_authenticated:
+            return Response({"detail": "Authentication required"}, status=401)
+        
         if request.user.is_authenticated and request.user.is_staff:
             bookings = Booking.objects.all()
         else:
@@ -299,18 +298,14 @@ def bookings(request):
             check_out = serializer.validated_data["check_out"]
             room = serializer.validated_data["room"]
             nights = (check_out - check_in).days
-
             room_price = room.room_type.price
             meal_price = Decimal("0.00")
-
             meal_id = request.data.get("meal_option")
 
             if meal_id:
                 meal = MealOption.objects.get(id=meal_id)
                 meal_price = meal.price
-
             total_price = (room_price * nights) + meal_price
-
             booking = serializer.save(
                 user=request.user if request.user.is_authenticated else None,
                 meal_price=meal_price,
@@ -321,7 +316,6 @@ def bookings(request):
             else:
                 booking.payment_status = "unpaid"
             booking.save()
-
             CustomerRecord.objects.create(
                 name=booking.guest_name,
                 email=booking.guest_email,
@@ -331,7 +325,6 @@ def bookings(request):
             create_notification("New Booking",f"New booking from {booking.user.email}","booking")
             create_log(request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
             setting = AutoCloseSetting.objects.first()
-
             if setting and setting.auto_close_booked_room:
                 if booking.room:
                     booking.room.status = "OFF"
@@ -343,23 +336,17 @@ def bookings(request):
 
 
 
-
-
 @api_view(["PATCH"])
-@permission_classes([AllowAny])
+@permission_classes([IsAdminUser])
 def update_booking_payment(request, booking_id):
     try:
         booking = Booking.objects.get(id=booking_id)
-
         booking.payment_status = request.data.get(
             "payment_status",
             booking.payment_status
         )
-
         booking.save()
-
         return Response({"message": "updated successfully"})
-
     except Booking.DoesNotExist:
         return Response(
             {"error": "Booking not found"},
@@ -369,10 +356,8 @@ def update_booking_payment(request, booking_id):
 
 
 
-
-
 @api_view(["PATCH"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def mark_all_bookings_read(request):
 
     Booking.objects.filter(is_read=False).update(is_read=True)
@@ -461,7 +446,7 @@ def booking_detail(request, id):
         return Response({"error": "Not found"}, status=404)
 
     
-    if booking.user != request.user:
+    if booking.user != request.user and not request.user.is_staff:
         return Response({"error": "Not allowed"}, status=403)
 
 
@@ -515,6 +500,7 @@ def profile(request):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def hotel_detail(request, id):
     try:
         hotel = Hotel.objects.get(id=id)
@@ -523,11 +509,11 @@ def hotel_detail(request, id):
 
     serializer = HotelSerializer(hotel)
 
-    create_log(request.user, "Viewed Hotel", hotel.id)
-    return Response(serializer.data)
+    
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def rooms_by_hotel(request, hotel_id):
     rooms = Room.objects.filter(hotel_id=hotel_id)
     serializer = RoomSerializer(rooms, many=True)
@@ -591,7 +577,7 @@ def booking_settings(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def dashboard_stats(request):
     today = date.today()
 
@@ -727,29 +713,25 @@ def all_bookings(request):
 
 # لإلغاء الحجز
 @api_view(['DELETE'])
+@permission_classes([IsAdminUser])
 def delete_booking(request, pk):
 
     try:
         booking = Booking.objects.get(id=pk)
-
     except Booking.DoesNotExist:
         return Response(
             {"error": "Booking not found"},
             status=404
         )
-
     create_log(
         request.user,
         "Deleted Booking",
         booking.id
     )
-
     booking.delete()
-
     return Response(
         {"message": "Booking deleted"}
     )
-
 
 
 @api_view(['GET', 'POST'])
