@@ -734,25 +734,88 @@ def delete_booking(request, pk):
     )
 
 
-@api_view(['GET', 'POST'])
+
+
+@api_view(["GET"])
 @permission_classes([AllowAny])
 def room_types(request):
-    if request.method == 'GET':
-        types = RoomType.objects.all()
-        serializer = RoomTypeSerializer(types, many=True)
-        return Response(serializer.data)
+    types = RoomType.objects.all()
+    serializer = RoomTypeSerializer(types, many=True)
+    return Response(serializer.data)
 
+
+@api_view(["POST"])
+@permission_classes([IsAdminUser])
+def admin_room_types(request):
     serializer = RoomTypeSerializer(data=request.data)
 
     if serializer.is_valid():
-        serializer.save()
-        create_log(request.user, "Created Room Type", serializer.data['id'])
+        room_type = serializer.save()
+        create_log(request.user, "Created Room Type", room_type.id)
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)
 
+
+
+# @api_view(['GET', 'POST'])
+# @permission_classes([AllowAny])
+# def room_types(request):
+#     if request.method == 'GET':
+#         types = RoomType.objects.all()
+#         serializer = RoomTypeSerializer(types, many=True)
+#         return Response(serializer.data)
+
+#     serializer = RoomTypeSerializer(data=request.data)
+
+#     if serializer.is_valid():
+#         serializer.save()
+#         create_log(request.user, "Created Room Type", serializer.data['id'])
+#         return Response(serializer.data, status=201)
+
+#     return Response(serializer.errors, status=400)
+
 # لإدارة أنواع الغرف (CRUD) - حذف نوع غرفة
-@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+# @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+# @permission_classes([AllowAny])
+# def room_type_detail(request, pk):
+#     try:
+#         room_type = RoomType.objects.get(id=pk)
+#     except RoomType.DoesNotExist:
+#         return Response(
+#             {"error": "Room type not found"},
+#             status=404
+#         )
+#     if request.method == 'GET':
+#         serializer = RoomTypeSerializer(room_type)
+#         return Response(serializer.data)
+
+#     if not request.user.is_authenticated or not request.user.is_staff:
+#         return Response({"detail": "Admin only"}, status=403)
+
+#     if request.method in ['PUT', 'PATCH']:
+#         serializer = RoomTypeSerializer(
+#             room_type,
+#             data=request.data,
+#             partial=True
+#         )
+#         if serializer.is_valid():
+#             serializer.save()
+#             create_log(request.user, "Updated Room Type", room_type.id)
+#             return Response(serializer.data)
+#         return Response(serializer.errors, status=400)
+#     if request.method == 'DELETE':
+#         if room_type.rooms.exists():
+#             return Response(
+#                 {"error": "Cannot delete this room type because it has rooms."},
+#                 status=400
+#             )
+#         create_log(request.user, "Deleted Room Type", room_type.name)
+#         room_type.delete()
+        
+#         return Response(status=204)
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def room_type_detail(request, pk):
     try:
@@ -762,10 +825,21 @@ def room_type_detail(request, pk):
             {"error": "Room type not found"},
             status=404
         )
+    serializer = RoomTypeSerializer(room_type)
+    return Response(serializer.data)
 
-    if request.method == 'GET':
-        serializer = RoomTypeSerializer(room_type)
-        return Response(serializer.data)
+
+
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_room_type_detail(request, pk):
+    try:
+        room_type = RoomType.objects.get(id=pk)
+    except RoomType.DoesNotExist:
+        return Response(
+            {"error": "Room type not found"},
+            status=404
+        )
 
     if request.method in ['PUT', 'PATCH']:
         serializer = RoomTypeSerializer(
@@ -773,16 +847,12 @@ def room_type_detail(request, pk):
             data=request.data,
             partial=True
         )
-
         if serializer.is_valid():
             serializer.save()
             create_log(request.user, "Updated Room Type", room_type.id)
             return Response(serializer.data)
-
         return Response(serializer.errors, status=400)
-
     if request.method == 'DELETE':
-
         if room_type.rooms.exists():
             return Response(
                 {"error": "Cannot delete this room type because it has rooms."},
@@ -792,7 +862,6 @@ def room_type_detail(request, pk):
         room_type.delete()
         
         return Response(status=204)
-
 
 
 
@@ -830,7 +899,6 @@ def room_detail(request, pk):
             {"error": "Room not found"},
             status=404
         )
-
     serializer = RoomSerializer(room)
     return Response(serializer.data)
 
@@ -846,14 +914,13 @@ def rooms_by_type(request, pk):
 
 #bulk availability add
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def bulk_room_availability(request):
     room_type_id = request.data.get("room_type")
     count = int(request.data.get("count", 0))
     available_from = request.data.get("available_from")
     available_to = request.data.get("available_to")
     status_value = request.data.get("status", "ON")
-
     rooms = Room.objects.filter(
         room_type_id=room_type_id
     ).order_by("room_number")[:count]
@@ -900,7 +967,25 @@ def room_availability(request, room_id):
 
 
 #restaurant
-@api_view(['GET', 'POST'])
+# @api_view(['GET', 'POST'])
+# @permission_classes([AllowAny])
+# def restaurants(request):
+#     if request.method == 'GET':
+#         data = Restaurant.objects.filter(is_active=True)
+#         serializer = RestaurantSerializer(data, many=True)
+#         return Response(serializer.data)
+
+#     serializer = RestaurantSerializer(data=request.data)
+
+#     if serializer.is_valid():
+#         serializer.save()
+#         create_log(request.user, "Created Restaurant", serializer.data['id'])
+#         return Response(serializer.data, status=201)
+
+#     return Response(serializer.errors, status=400)
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def restaurants(request):
     if request.method == 'GET':
@@ -908,27 +993,70 @@ def restaurants(request):
         serializer = RestaurantSerializer(data, many=True)
         return Response(serializer.data)
 
+
+
+# @api_view(["GET" , "POST"])
+# @permission_classes([IsAdminUser])
+# def admin_restaurants(request):
+#     restaurants = Restaurant.objects.all().order_by("-id")
+#     serializer = RestaurantSerializer(restaurants, many=True)
+#     return Response(serializer.data)
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAdminUser])
+def admin_restaurants(request):
+    if request.method == "GET":
+        restaurants = Restaurant.objects.all().order_by("-id")
+        serializer = RestaurantSerializer(restaurants, many=True)
+        return Response(serializer.data)
+
     serializer = RestaurantSerializer(data=request.data)
 
     if serializer.is_valid():
-        serializer.save()
-        create_log(request.user, "Created Restaurant", serializer.data['id'])
+        restaurant = serializer.save()
+        create_log(request.user, "Created Restaurant", restaurant.id)
         return Response(serializer.data, status=201)
 
     return Response(serializer.errors, status=400)
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def admin_restaurants(request):
-    restaurants = Restaurant.objects.all().order_by("-id")
-    serializer = RestaurantSerializer(restaurants, many=True)
-    return Response(serializer.data)
+# @api_view(['GET', 'PUT', 'DELETE'])
+# @permission_classes([IsAdminUser])
+# def restaurant_detail(request, pk):
+#     try:
+#         restaurant = Restaurant.objects.get(id=pk)
+#     except Restaurant.DoesNotExist:
+#         return Response({"error": "Restaurant not found"}, status=404)
+
+#     if request.method == 'GET':
+#         serializer = RestaurantSerializer(restaurant)
+#         return Response(serializer.data)
+
+#     if not request.user.is_authenticated or not request.user.is_staff:
+#         return Response({"detail": "Admin only"}, status=403)
+
+#     if request.method == 'PUT':
+#         serializer = RestaurantSerializer(
+#             restaurant,
+#             data=request.data,
+#             partial=True
+#         )
+
+#         if serializer.is_valid():
+#             serializer.save()
+#             create_log(request.user, "Updated Restaurant", f"{restaurant.name}")
+#             return Response(serializer.data)
+
+#         return Response(serializer.errors, status=400)
+
+#     if request.method == 'DELETE':
+#         create_log(request.user, "Deleted Restaurant", restaurant.name)
+#         restaurant.delete()
+        
+#         return Response(status=204)
 
 
-
-
-@api_view(['GET', 'PUT', 'DELETE'])
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def restaurant_detail(request, pk):
     try:
@@ -939,6 +1067,15 @@ def restaurant_detail(request, pk):
     if request.method == 'GET':
         serializer = RestaurantSerializer(restaurant)
         return Response(serializer.data)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_restaurant_detail(request, pk):
+    try:
+        restaurant = Restaurant.objects.get(id=pk)
+    except Restaurant.DoesNotExist:
+        return Response({"error": "Restaurant not found"}, status=404)
 
     if request.method == 'PUT':
         serializer = RestaurantSerializer(
@@ -962,53 +1099,119 @@ def restaurant_detail(request, pk):
 
 
 
-
-
 # Nearby Places
-@api_view(['GET', 'POST'])
+# @api_view(['GET', 'POST'])
+# @permission_classes([AllowAny])
+# def nearby_places(request):
+
+#     if request.method == 'GET':
+#         places = NearbyPlace.objects.filter(is_active=True).order_by("order" , "id")
+#         serializer = NearbyPlaceSerializer(places, many=True , context={"request": request})
+#         return Response(serializer.data)
+
+#     serializer = NearbyPlaceSerializer(data=request.data)
+
+#     if serializer.is_valid():
+#         serializer.save()
+#         create_log(request.user, "Created Nearby Place", serializer.data['id'])
+#         return Response(serializer.data, status=201)
+
+#     return Response(serializer.errors, status=400)
+
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def nearby_places(request):
-
-    if request.method == 'GET':
-        places = NearbyPlace.objects.filter(is_active=True).order_by("order" , "id")
-        serializer = NearbyPlaceSerializer(places, many=True , context={"request": request})
-        return Response(serializer.data)
-
-    serializer = NearbyPlaceSerializer(data=request.data)
-
-    if serializer.is_valid():
-        serializer.save()
-        create_log(request.user, "Created Nearby Place", serializer.data['id'])
-        return Response(serializer.data, status=201)
-
-    return Response(serializer.errors, status=400)
-
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def admin_nearby_places(request):
-    nearby_places = NearbyPlace.objects.all().order_by("-id")
-    serializer = NearbyPlaceSerializer(nearby_places, many=True)
+    places = NearbyPlace.objects.filter(is_active=True).order_by("order" , "id")
+    serializer = NearbyPlaceSerializer(places, many=True , context={"request": request})
     return Response(serializer.data)
 
 
 
+# @api_view(["GET"])
+# @permission_classes([IsAuthenticated])
+# def admin_nearby_places(request):
+#     nearby_places = NearbyPlace.objects.all().order_by("-id")
+#     serializer = NearbyPlaceSerializer(nearby_places, many=True)
+#     return Response(serializer.data)
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAdminUser])
+def admin_nearby_places(request):
+    if request.method == "GET":
+        nearby_places = NearbyPlace.objects.all().order_by("-id")
+        serializer = NearbyPlaceSerializer(nearby_places, many=True)
+        return Response(serializer.data)
+    serializer = NearbyPlaceSerializer(data=request.data)
+    if serializer.is_valid():
+        place = serializer.save()
+        create_log(request.user, "Created Nearby Place", place.id)
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
 
 
 
 
-@api_view(['GET', 'PUT', 'DELETE'])
+
+
+
+# @api_view(['GET', 'PUT', 'DELETE'])
+# @permission_classes([AllowAny])
+# def nearby_place_detail(request, pk):
+#     try:
+#         place = NearbyPlace.objects.get(id=pk)
+#     except NearbyPlace.DoesNotExist:
+#         return Response({"error": "Place not found"}, status=404)
+
+#     if request.method == 'GET':
+#         serializer = NearbyPlaceSerializer(place)
+#         return Response(serializer.data)
+    
+#     if not request.user.is_authenticated or not request.user.is_staff:
+#         return Response({"detail": "Admin only"}, status=403)
+
+#     if request.method == 'PUT':
+#         serializer = NearbyPlaceSerializer(
+#             place,
+#             data=request.data,
+#             partial=True
+#         )
+
+#         if serializer.is_valid():
+#             serializer.save()
+#             create_log(request.user, "Updated Nearby Place", place.id)
+#             return Response(serializer.data)
+
+#         return Response(serializer.errors, status=400)
+
+#     if request.method == 'DELETE':
+#         create_log(request.user, "Deleted Nearby Place", place.name_en)
+#         place.delete()
+        
+#         return Response(status=204)
+    
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def nearby_place_detail(request, pk):
     try:
         place = NearbyPlace.objects.get(id=pk)
     except NearbyPlace.DoesNotExist:
         return Response({"error": "Place not found"}, status=404)
+    serializer = NearbyPlaceSerializer(place)
+    return Response(serializer.data)
 
-    if request.method == 'GET':
-        serializer = NearbyPlaceSerializer(place)
-        return Response(serializer.data)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_nearby_place_detail(request, pk):
+    try:
+        place = NearbyPlace.objects.get(id=pk)
+    except NearbyPlace.DoesNotExist:
+        return Response({"error": "Place not found"}, status=404)
 
     if request.method == 'PUT':
         serializer = NearbyPlaceSerializer(
@@ -1029,51 +1232,116 @@ def nearby_place_detail(request, pk):
         place.delete()
         
         return Response(status=204)
-    
+
+
+
+
+
 
 
 # Services
-@api_view(['GET', 'POST'])
+# @api_view(['GET', 'POST'])
+# @permission_classes([AllowAny])
+# def services(request):
+#     if request.method == 'GET':
+#         data = Service.objects.filter(is_active=True)
+#         serializer = ServiceSerializer(data, many=True)
+#         return Response(serializer.data)
+#     serializer = ServiceSerializer(data=request.data)
+#     if serializer.is_valid():
+#         serializer.save()
+#         create_log(request.user, "Created Service", serializer.data['id'])
+#         return Response(serializer.data, status=201)
+#     return Response(serializer.errors, status=400)
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def services(request):
+    data = Service.objects.filter(is_active=True)
+    serializer = ServiceSerializer(data, many=True)
+    return Response(serializer.data)
+    
+
+
+
+
+
+
+
+
+# @api_view(["GET"])
+# @permission_classes([IsAdminUser])
+# def admin_services(request):
+#     services = Service.objects.all().order_by("-id")
+#     serializer = ServiceSerializer(services, many=True)
+#     return Response(serializer.data)
+
+@api_view(["GET"])
+@permission_classes([IsAdminUser])
+def admin_services(request):
     if request.method == 'GET':
         data = Service.objects.filter(is_active=True)
         serializer = ServiceSerializer(data, many=True)
         return Response(serializer.data)
-
     serializer = ServiceSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
         create_log(request.user, "Created Service", serializer.data['id'])
         return Response(serializer.data, status=201)
-
     return Response(serializer.errors, status=400)
 
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def admin_services(request):
-    services = Service.objects.all().order_by("-id")
-    serializer = ServiceSerializer(services, many=True)
-    return Response(serializer.data)
+# @api_view(['GET', 'PUT', 'DELETE'])
+# @permission_classes([AllowAny])
+# def service_detail(request, pk):
+#     try:
+#         service = Service.objects.get(id=pk)
+#     except Service.DoesNotExist:
+#         return Response({"error": "Service not found"}, status=404)
+#     if request.method == 'GET':
+#         serializer = ServiceSerializer(service)
+#         return Response(serializer.data)
+    
+
+#     if request.method == 'PUT':
+#         serializer = ServiceSerializer(service, data=request.data, partial=True)
+#         if serializer.is_valid():
+#             serializer.save()
+#             create_log(request.user, "Updated Service", service.id)
+#             return Response(serializer.data)
+#         return Response(serializer.errors, status=400)
+
+#     if request.method == 'DELETE':
+#         create_log(request.user, "Deleted Service", service.title)
+#         service.delete()
+#         return Response(status=204)
+    
 
 
 
-
-@api_view(['GET', 'PUT', 'DELETE'])
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def service_detail(request, pk):
     try:
         service = Service.objects.get(id=pk)
     except Service.DoesNotExist:
         return Response({"error": "Service not found"}, status=404)
+    serializer = ServiceSerializer(service)
+    return Response(serializer.data)
 
-    if request.method == 'GET':
-        serializer = ServiceSerializer(service)
-        return Response(serializer.data)
 
-    if request.method == 'PUT':
+
+@api_view(['PUT',"PATCH", 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_service_detail(request, pk):
+    try:
+        service = Service.objects.get(id=pk)
+    except Service.DoesNotExist:
+        return Response({"error": "Service not found"}, status=404)
+    
+
+    if request.method in ['PUT',"PATCH"]:
         serializer = ServiceSerializer(service, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -1085,14 +1353,37 @@ def service_detail(request, pk):
         create_log(request.user, "Deleted Service", service.title)
         service.delete()
         return Response(status=204)
-    
 # End Services
 
 
 
 # Gallery List/Create
-@api_view(['GET', 'POST'])
+# @api_view(['GET', 'POST'])
+# @permission_classes([AllowAny])
+# def galleries(request):
+
+#     if request.method == 'GET':
+#         data = Gallery.objects.filter(is_active=True)
+#         serializer = GallerySerializer(data, many=True)
+#         return Response(serializer.data)
+#     serializer = GallerySerializer(data=request.data)
+#     if serializer.is_valid():
+#         gallery = serializer.save()
+#         create_log(request.user if request.user.is_authenticated else None, "Created Gallery", f" Gallery {gallery.title_en}")
+#         return Response(serializer.data, status=201)
+#     return Response(serializer.errors, status=400)
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
+def galleries(request):
+    data = Gallery.objects.filter(is_active=True)
+    serializer = GallerySerializer(data, many=True)
+    return Response(serializer.data)
+    
+
+# Gallery List/Create
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
 def galleries(request):
 
     if request.method == 'GET':
@@ -1106,11 +1397,60 @@ def galleries(request):
         return Response(serializer.data, status=201)
     return Response(serializer.errors, status=400)
 
+
+
 # Gallery Detail
-@api_view(['GET', 'PUT', 'DELETE'])
+# @api_view(['GET', 'PUT', 'DELETE'])
+# @permission_classes([IsAdminUser])
+# def gallery_detail(request, pk):
+#     try:
+#         gallery = Gallery.objects.get(id=pk)
+#     except Gallery.DoesNotExist:
+#         return Response(
+#             {"error": "Gallery not found"},
+#             status=status.HTTP_404_NOT_FOUND
+#         )
+#     # GET
+#     if request.method == 'GET':
+#         serializer = GallerySerializer(gallery)
+#         return Response(serializer.data)
+#     # PUT
+#     if request.method == 'PUT':
+#         serializer = GallerySerializer(
+#             gallery,
+#             data=request.data,
+#             partial=True
+#         )
+#         if serializer.is_valid():
+#             serializer.save()
+#             create_log(request.user if request.user.is_authenticated else None, "Updated Gallery", f" Gallery {gallery.title_en}")
+#             return Response(serializer.data)
+#         return Response(serializer.errors, status=400)
+#     # DELETE
+#     create_log(request.user if request.user.is_authenticated else None, "Deleted Gallery", f" Gallery {gallery.title_en}")
+#     gallery.delete()
+#     return Response(status=204)
+
+
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def gallery_detail(request, pk):
+    try:
+        gallery = Gallery.objects.get(id=pk)
+    except Gallery.DoesNotExist:
+        return Response(
+            {"error": "Gallery not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    serializer = GallerySerializer(gallery)
+    return Response(serializer.data)
 
+
+@api_view(['PUT','PATCH', 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_gallery_detail(request, pk):
     try:
         gallery = Gallery.objects.get(id=pk)
     except Gallery.DoesNotExist:
@@ -1119,35 +1459,34 @@ def gallery_detail(request, pk):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    # GET
-    if request.method == 'GET':
-        serializer = GallerySerializer(gallery)
-        return Response(serializer.data)
-
     # PUT
-    if request.method == 'PUT':
+    if request.method in ['PUT','PATCH']:
         serializer = GallerySerializer(
             gallery,
             data=request.data,
             partial=True
         )
-
         if serializer.is_valid():
-            serializer.save()
-            create_log(request.user if request.user.is_authenticated else None, "Updated Gallery", f" Gallery {gallery.title_en}")
+            updated_gallery = serializer.save()
+            create_log(request.user if request.user.is_authenticated else None, "Updated Gallery", updated_gallery.title_en)
             return Response(serializer.data)
-
         return Response(serializer.errors, status=400)
-
     # DELETE
-    create_log(request.user if request.user.is_authenticated else None, "Deleted Gallery", f" Gallery {gallery.title_en}")
+    create_log(request.user if request.user.is_authenticated else None, "Deleted Gallery", gallery.title_en)
     gallery.delete()
     return Response(status=204)
 
 
+
+
+
+
+
+
+
 # Gallery Images
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAdminUser])
 def gallery_images(request):
 
     serializer = GalleryImageSerializer(data=request.data)
@@ -1161,7 +1500,7 @@ def gallery_images(request):
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([AllowAny])
+@permission_classes([IsAdminUser])
 def gallery_image_detail(request, pk):
 
     try:
@@ -1201,68 +1540,72 @@ def gallery_image_detail(request, pk):
 # Review List/Create
 # Reviews
 
-@api_view(['GET', 'POST'])
+# @api_view(['GET', 'POST'])
+# @permission_classes([AllowAny])
+# def reviews(request):
+#     if request.method == 'GET':
+#         if request.user.is_authenticated and request.user.is_staff:
+#             data = Review.objects.all().order_by('-created_at')
+#         else:
+#             data = Review.objects.filter(
+#                 is_active=True
+#             ).order_by('-created_at')
+#         serializer = ReviewSerializer(data, many=True)
+#         return Response(serializer.data)
+#     serializer = ReviewSerializer(data=request.data)
+#     if serializer.is_valid():
+#         serializer.save()
+#         return Response(serializer.data, status=201)
+#     return Response(serializer.errors, status=400)
+@api_view(['GET'])
 @permission_classes([AllowAny])
 def reviews(request):
+    if request.user.is_authenticated and request.user.is_staff:
+        data = Review.objects.all().order_by('-created_at')
+    else:
+        data = Review.objects.filter(
+            is_active=True
+        ).order_by('-created_at')
+    serializer = ReviewSerializer(data, many=True)
+    return Response(serializer.data)
 
-    if request.method == 'GET':
 
-        if request.user.is_authenticated and request.user.is_staff:
-            data = Review.objects.all().order_by('-created_at')
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_reviews(request):
+    reviews = Review>object.all().order_by("-created_at")
+    serializer = ReviewSerializer(reviews, many=True)
+    return Response(serializer.data)
 
-        else:
-            data = Review.objects.filter(
-                is_active=True
-            ).order_by('-created_at')
-
-        serializer = ReviewSerializer(data, many=True)
-        return Response(serializer.data)
-
-    serializer = ReviewSerializer(data=request.data)
-
-    if serializer.is_valid():
-        serializer.save()
-        
-        return Response(serializer.data, status=201)
-
-    return Response(serializer.errors, status=400)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([AllowAny])
+@permission_classes([IsAdminUser])
 def review_detail(request, pk):
-
     try:
         review = Review.objects.get(id=pk)
-
     except Review.DoesNotExist:
         return Response(
             {"error": "Review not found"},
             status=status.HTTP_404_NOT_FOUND
         )
-
     # GET
     if request.method == 'GET':
         serializer = ReviewSerializer(review)
         create_log(request.user if request.user.is_authenticated else None, "Viewed Review", f"{review.name} - {review.rating}/5")
         return Response(serializer.data)
-
     # PUT
     if request.method == 'PUT':
-
         serializer = ReviewSerializer(
             review,
             data=request.data,
             partial=True
         )
-
         if serializer.is_valid():
             serializer.save()
             create_log(request.user, "Updated Review", f"{review.name} - {review.rating}/5")
             return Response(serializer.data)
-
         return Response(serializer.errors, status=400)
-
     # DELETE
     create_log(request.user, "Deleted Review", review.id)
     review.delete()
@@ -1550,8 +1893,53 @@ def logs(request):
 
 
 #Contact Us
-@api_view(['GET', 'PUT'])
+# @api_view(['GET', 'PUT'])
+# @permission_classes([AllowAny])
+# def contact_settings(request):
+#     setting = ContactSetting.objects.first()
+
+#     if not setting:
+#         setting = ContactSetting.objects.create(
+#             phone="",
+#             email="",
+#             address=""
+#         )
+
+#     if request.method == 'GET':
+#         serializer = ContactSettingSerializer(setting)
+#         return Response(serializer.data)
+
+#     serializer = ContactSettingSerializer(
+#         setting,
+#         data=request.data,
+#         partial=True
+#     )
+
+#     if serializer.is_valid():
+#         serializer.save()
+#         return Response(serializer.data)
+
+#     return Response(serializer.errors, status=400)
+
+
+
+
+@api_view(['GET'])
 @permission_classes([AllowAny])
+def public_contact_settings(request):
+    setting = ContactSetting.objects.first()
+    if not setting:
+        setting = ContactSetting.objects.create(
+            phone="",
+            email="",
+            address=""
+        )
+        serializer = ContactSettingSerializer(setting)
+        return Response(serializer.data)
+    
+
+@api_view(['GET', 'PUT' , 'PATCH'])
+@permission_classes([IsAdminUser])
 def contact_settings(request):
     setting = ContactSetting.objects.first()
 
@@ -1582,15 +1970,28 @@ def contact_settings(request):
 
 
 
-@api_view(['GET', 'POST'])
+# @api_view(['GET', 'POST'])
+# @permission_classes([IsAdminUser])
+# def contact_messages(request):
+
+#     if request.method == 'GET':
+#         messages = ContactMessage.objects.all().order_by('-created_at')
+#         serializer = ContactMessageSerializer(messages, many=True)
+#         return Response(serializer.data)
+
+#     serializer = ContactMessageSerializer(data=request.data)
+
+#     if serializer.is_valid():
+#         message = serializer.save()
+#         create_notification("New Contact Message",f"Message from {message.name}","contact")
+#         return Response(serializer.data, status=201)
+
+#     return Response(serializer.errors, status=400)
+
+
+@api_view(['POST'])
 @permission_classes([AllowAny])
-def contact_messages(request):
-
-    if request.method == 'GET':
-        messages = ContactMessage.objects.all().order_by('-created_at')
-        serializer = ContactMessageSerializer(messages, many=True)
-        return Response(serializer.data)
-
+def submit_contact_messages(request):
     serializer = ContactMessageSerializer(data=request.data)
 
     if serializer.is_valid():
@@ -1601,6 +2002,12 @@ def contact_messages(request):
     return Response(serializer.errors, status=400)
 
 
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def contact_messages(request):
+    messages = ContactMessage.objects.all().order_by('-created_at')
+    serializer = ContactMessageSerializer(messages, many=True)
+    return Response(serializer.data)
 
 
 
@@ -1624,8 +2031,8 @@ def contact_message_detail(request, pk):
 
 
 
-@api_view(["GET", "PUT"])
-@permission_classes([AllowAny])
+@api_view(["GET", "PUT" , 'PATCH'])
+@permission_classes([IsAdminUser])
 def system_settings(request):
     setting, created = SystemSetting.objects.get_or_create(id=1)
 
@@ -1663,31 +2070,24 @@ def admin_profiles(request):
     return Response(serializer.data)
 
 
-@api_view(["GET", "PUT", "DELETE"])
+@api_view(["GET", "PUT",'PATCH', "DELETE"])
 @permission_classes([IsAdminUser])
 def admin_profile_detail(request, pk):
     try:
         profile = Profile.objects.select_related("user").get(id=pk)
-
         if profile.user.is_staff or profile.user.is_superuser:
             return Response({"error": "This is not a customer profile"}, status=403)
-
     except Profile.DoesNotExist:
         return Response({"error": "Profile not found"}, status=404)
-
     if request.method == "GET":
         serializer = AdminProfileDetailSerializer(profile)
         return Response(serializer.data)
-
     if request.method == "PUT":
         serializer = AdminProfileDetailSerializer(profile, data=request.data, partial=True)
-
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-
         return Response(serializer.errors, status=400)
-
     if request.method == "DELETE":
         user = profile.user
         profile.delete()
@@ -1711,40 +2111,28 @@ def customer_records(request):
 
 
 
-
-
-
-
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def fake_payment(request, booking_id):
-
     try:
         booking = Booking.objects.get(id=booking_id)
-
     except Booking.DoesNotExist:
         return Response(
             {"error": "Booking not found"},
             status=404
         )
-
     card_number = request.data.get("card_number", "").replace(" ", "")
-
     if card_number == "4242424242424242":
-
         booking.payment_status = "paid"
         booking.payment_method = "online"
         booking.save()
-
         return Response({
             "message": "Payment successful",
             "payment_status": booking.payment_status
         })
-
     booking.payment_status = "failed"
     booking.payment_method = "online"
     booking.save()
-
     return Response(
         {
             "error": "Payment failed",
@@ -1760,9 +2148,14 @@ def fake_payment(request, booking_id):
 @api_view(["GET"])
 @permission_classes([IsAdminUser])
 def booking_detail(request, booking_id):
-    booking = Booking.objects.get(id=booking_id)
+    try:
+        booking = Booking.objects.get(id=booking_id)
+    except Booking.DoesNotExist:
+        return Response({"error" : "booking not found"} , status=404)
     serializer = BookingSerializer(booking)
     return Response(serializer.data)
+
+
 
 
 
@@ -1778,6 +2171,7 @@ def update_booking_notes(request, booking_id):
 
 
 
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def active_hero_slides(request):
@@ -1785,9 +2179,8 @@ def active_hero_slides(request):
     serializer = HeroSlideSerializer(slides, many=True, context={"request": request})
     return Response(serializer.data)
 
-
-
 @api_view(["GET", "POST"])
+@permission_classes([IsAdminUser])
 @parser_classes([MultiPartParser, FormParser])
 def admin_hero_slides(request):
     if request.method == "GET":
@@ -1805,6 +2198,9 @@ def admin_hero_slides(request):
 
     print(serializer.errors)
     return Response(serializer.errors, status=400)
+
+
+
 
 
 @api_view(["PUT", "PATCH", "DELETE"])
