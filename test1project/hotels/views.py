@@ -92,9 +92,18 @@ def get_hotels(request):
 
 
 
-@api_view(["GET", "POST"])
+@api_view(["GET"])
 @permission_classes([AllowAny])
 def currencies(request):
+    data = Currency.objects.all()
+    serializer = CurrencySerializer(data, many=True)
+    return Response(serializer.data)
+
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAdminUser])
+def admin_currencies(request):
     # get
     if request.method == "GET":
         data = Currency.objects.all()
@@ -102,30 +111,40 @@ def currencies(request):
         return Response(serializer.data)
     
     # post
-    if not request.user.is_staff:
-        return Response({"detail":"Unauthorized"} , status=403)
     serializer = CurrencySerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
-        create_log(request.user, "Changed Currency", Currency.name)
-        return Response(serializer.data, status=201)
+        currency = serializer.save()
+        create_log(request.user, "Currency Added", currency.name)
+        return Response(CurrencySerializer(currency).data, status=201)
     return Response(serializer.errors, status=400)
 
-@api_view(["PUT", "DELETE"])
+
+
+@api_view(["GET", "PUT" , "PATCH" , "DELETE"])
 @permission_classes([IsAdminUser])
 def currency_detail(request, pk):
     try:
         currency = Currency.objects.get(id=pk)
     except Currency.DoesNotExist:
         return Response({"error": "Currency not found"}, status=404)
-    if request.method == "PUT":
+    
+    if request.method == "GET":
+        serializer = CurrencySerializer(currency)
+        return Response(serializer.data)
+
+
+    if request.method in ["PUT" , "PATCH"]:
         if request.data.get("is_active") == True:
             Currency.objects.all().update(is_active=False)
         serializer = CurrencySerializer(currency, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            create_log(request.user, "Currency Changed", currency.name)
+
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+    create_log(request.user, "Currency Deleted" , currency.name)
+    
     currency.delete()
     return Response(status=204)
 
@@ -723,6 +742,10 @@ def delete_booking(request, pk):
             {"error": "Booking not found"},
             status=404
         )
+    
+    if not request.user.is_staff and booking.user != request.user:
+        return Response({"error": "Not Allowed"} , status=403)
+
     create_log(
         request.user,
         "Deleted Booking",
@@ -1136,7 +1159,7 @@ def nearby_places(request):
 #     serializer = NearbyPlaceSerializer(nearby_places, many=True)
 #     return Response(serializer.data)
 
-@api_view(["GET", "POST"])
+@api_view(["GET", "POST" , 'PUT'])
 @permission_classes([IsAdminUser])
 def admin_nearby_places(request):
     if request.method == "GET":
@@ -1146,7 +1169,7 @@ def admin_nearby_places(request):
     serializer = NearbyPlaceSerializer(data=request.data)
     if serializer.is_valid():
         place = serializer.save()
-        create_log(request.user, "Created Nearby Place", place.id)
+        create_log(request.user, "Created Nearby Place", place.name_en)
         return Response(serializer.data, status=201)
     return Response(serializer.errors, status=400)
 
@@ -1222,7 +1245,7 @@ def admin_nearby_place_detail(request, pk):
 
         if serializer.is_valid():
             serializer.save()
-            create_log(request.user, "Updated Nearby Place", place.id)
+            create_log(request.user, "Updated Nearby Place", place.name_en)
             return Response(serializer.data)
 
         return Response(serializer.errors, status=400)
@@ -1276,7 +1299,7 @@ def services(request):
 #     serializer = ServiceSerializer(services, many=True)
 #     return Response(serializer.data)
 
-@api_view(["GET"])
+@api_view(["GET",'POST'])
 @permission_classes([IsAdminUser])
 def admin_services(request):
     if request.method == 'GET':
@@ -1384,7 +1407,7 @@ def galleries(request):
 # Gallery List/Create
 @api_view(['GET', 'POST'])
 @permission_classes([IsAdminUser])
-def galleries(request):
+def admin_galleries(request):
 
     if request.method == 'GET':
         data = Gallery.objects.filter(is_active=True)
@@ -2031,9 +2054,19 @@ def contact_message_detail(request, pk):
 
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def system_settings(request):
+    setting, created = SystemSetting.objects.get_or_create(id=1)
+    serializer = SystemSettingSerializer(setting)
+    return Response(serializer.data)
+
+    
+
+
 @api_view(["GET", "PUT" , 'PATCH'])
 @permission_classes([IsAdminUser])
-def system_settings(request):
+def admin_system_settings(request):
     setting, created = SystemSetting.objects.get_or_create(id=1)
 
     if request.method == "GET":
@@ -2159,14 +2192,32 @@ def booking_detail(request, booking_id):
 
 
 
+# @api_view(["PATCH"])
+# @permission_classes([IsAdminUser])
+# def update_booking_notes(request, booking_id):
+#     booking = Booking.objects.get(id=booking_id)
+#     booking.notes = request.data.get("notes", "")
+#     booking.save()
+#     return Response({"message": "Notes updated", "notes": booking.notes})
+
 @api_view(["PATCH"])
 @permission_classes([IsAdminUser])
 def update_booking_notes(request, booking_id):
-    booking = Booking.objects.get(id=booking_id)
+    try:
+        booking = Booking.objects.get(id=booking_id)
+    except Booking.DoesNotExist:
+        return Response(
+            {"error": "Booking not found"},
+            status=404
+        )
+
     booking.notes = request.data.get("notes", "")
     booking.save()
-    return Response({"message": "Notes updated", "notes": booking.notes})
 
+    return Response({
+        "message": "Notes updated",
+        "notes": booking.notes
+    })
 
 
 
@@ -2178,6 +2229,8 @@ def active_hero_slides(request):
     slides = HeroSlide.objects.filter(is_active=True).order_by("order", "id")
     serializer = HeroSlideSerializer(slides, many=True, context={"request": request})
     return Response(serializer.data)
+
+
 
 @api_view(["GET", "POST"])
 @permission_classes([IsAdminUser])
@@ -2204,6 +2257,7 @@ def admin_hero_slides(request):
 
 
 @api_view(["PUT", "PATCH", "DELETE"])
+@permission_classes([IsAdminUser])
 @parser_classes([MultiPartParser, FormParser])
 def admin_hero_slide_detail(request, pk):
     slide = get_object_or_404(HeroSlide, pk=pk)
@@ -2230,6 +2284,7 @@ def admin_hero_slide_detail(request, pk):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def amenities(request):
     items = Amenity.objects.all()
     serializer = AmenitySerializer(items, many=True)
@@ -2238,6 +2293,7 @@ def amenities(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAdminUser])
 def dashboard_occupancy(request):
     start_date = request.GET.get("start_date")
     days = int(request.GET.get("days", 8))
@@ -2276,11 +2332,9 @@ def user_table_setting(request, table_name):
         table_name=table_name,
         defaults={"visible_columns": {}}
     )
-
     if request.method == "GET":
         serializer = UserTableSettingSerializer(setting)
         return Response(serializer.data)
-
     if request.method == "PATCH":
         visible_columns = request.data.get("visible_columns", {})
         setting.visible_columns = visible_columns
@@ -2288,14 +2342,10 @@ def user_table_setting(request, table_name):
 
         serializer = UserTableSettingSerializer(setting)
         return Response(serializer.data)
-    
-
-
-
 
 # اعداد التغيير التلقائي لحالة الغرفة
 @api_view(["GET", "PUT"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def auto_close_setting(request):
     setting, created = AutoCloseSetting.objects.get_or_create(id=1)
 
@@ -2321,32 +2371,20 @@ def auto_close_setting(request):
 @permission_classes([AllowAny])
 def site_status(request):
     setting, created = SiteSetting.objects.get_or_create(id=1)
-
     return Response({
         "maintenance_mode": setting.maintenance_mode
     })
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def toggle_maintenance(request):
     setting, created = SiteSetting.objects.get_or_create(id=1)
-
     setting.maintenance_mode = not setting.maintenance_mode
     setting.save()
-
     return Response({
         "maintenance_mode": setting.maintenance_mode
     })
-
-
-
-
-
-
-
-
-
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -2356,8 +2394,9 @@ def facilities(request):
     return Response(serializer.data)
 
 
+
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 @parser_classes([MultiPartParser, FormParser])
 def admin_facilities(request):
     if request.method == "GET":
@@ -2374,7 +2413,7 @@ def admin_facilities(request):
 
 
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 @parser_classes([MultiPartParser, FormParser])
 def admin_facility_detail(request, pk):
     facility = get_object_or_404(Facility, pk=pk)
@@ -2382,33 +2421,21 @@ def admin_facility_detail(request, pk):
     if request.method == "GET":
         serializer = FacilitySerializer(facility)
         return Response(serializer.data)
-
     if request.method == "DELETE":
         facility.delete()
         return Response({"message": "Deleted successfully"})
-
     serializer = FacilitySerializer(
         facility,
         data=request.data,
         partial=True
     )
-
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
-
     return Response(serializer.errors, status=400)
 
-
-
-
-
-
-
-
-
 @api_view(["GET", "PUT"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def policy_settings(request):
     setting, created = PolicySetting.objects.get_or_create(id=1)
 
@@ -2444,7 +2471,7 @@ def public_social_settings(request):
 
 
 @api_view(["GET", "PUT"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminUser])
 def social_settings(request):
     setting, created = SocialMediaSetting.objects.get_or_create(id=1)
 

@@ -1,0 +1,2 @@
+web: gunicorn
+test1project.wsgi:application
