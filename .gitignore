@@ -13,3 +13,10 @@ build/
 # VSCode
 .vscode/
 
+media/
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.mp4
+
