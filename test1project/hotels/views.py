@@ -341,7 +341,8 @@ def bookings(request):
                 phone=booking.guest_phone,
                 country=booking.guest_country
             )
-            create_notification("New Booking",f"New booking from {booking.user.email}","booking")
+            guest_email = serializer.validated_data.get("email" , "Guest")
+            create_notification("New Booking",f"New booking from {guest_email}","booking")
             create_log(request.user if request.user.is_authenticated else None, "Created Booking", booking.booking_code)
             setting = AutoCloseSetting.objects.first()
             if setting and setting.auto_close_booked_room:
