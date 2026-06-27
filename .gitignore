@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 .env
 .venv/
+venv/
 
 # React
 node_modules/
@@ -13,10 +14,8 @@ build/
 # VSCode
 .vscode/
 
-media/
-*.jpg
-*.jpeg
-*.png
-*.webp
-*.mp4
 
+db.sqlite3
+test1project/db.sqlite3
+media/
+test1project/media/
