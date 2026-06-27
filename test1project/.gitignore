@@ -2,9 +2,3 @@
 __pycache__/
 *.pyc
 .env
-media/
-*.jpg
-*.jpeg
-*.png
-*.webp
-*.mp4
