@@ -1585,10 +1585,7 @@ def gallery_image_detail(request, pk):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def reviews(request):
-    if request.user.is_authenticated and request.user.is_staff:
-        data = Review.objects.all().order_by('-created_at')
-    else:
-        data = Review.objects.filter(
+    data = Review.objects.filter(
             is_active=True
         ).order_by('-created_at')
     serializer = ReviewSerializer(data, many=True)
