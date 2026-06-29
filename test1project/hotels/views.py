@@ -1595,7 +1595,7 @@ def reviews(request):
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def admin_reviews(request):
-    reviews = Review>object.all().order_by("-created_at")
+    reviews = Review.objects.all().order_by("-created_at")
     serializer = ReviewSerializer(reviews, many=True)
     return Response(serializer.data)
 
