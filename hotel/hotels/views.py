@@ -15,7 +15,7 @@ from django.db.models import ProtectedError
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from datetime import date
+from datetime import date, timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -37,6 +37,7 @@ from datetime import timedelta
 from decimal import Decimal
 from datetime import datetime
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.utils import timezone
 
 
 
@@ -308,7 +309,7 @@ def bookings(request):
         serializer = BookingSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             meal_id = request.data.get("meal_option")
-            meal_price = 0
+            meal_price = Decimal("0.00")
 
             if meal_id:
                 meal = MealOption.objects.get(id=meal_id)
@@ -318,23 +319,16 @@ def bookings(request):
             room = serializer.validated_data["room"]
             nights = (check_out - check_in).days
             room_price = room.room_type.price
-            meal_price = Decimal("0.00")
-            meal_id = request.data.get("meal_option")
-
-            if meal_id:
-                meal = MealOption.objects.get(id=meal_id)
-                meal_price = meal.price
             total_price = (room_price * nights) + meal_price
             booking = serializer.save(
                 user=request.user if request.user.is_authenticated else None,
                 meal_price=meal_price,
                 total_price=total_price,
+                booking_status="pending",
+                payment_status="unpaid",
+                expires_at=timezone.now() + timedelta(hours=24)
             )
-            if request.data.get("payment_method") == "online":
-                booking.payment_status = "paid"
-            else:
-                booking.payment_status = "unpaid"
-            booking.save()
+            
             CustomerRecord.objects.create(
                 name=booking.guest_name,
                 email=booking.guest_email,
@@ -346,10 +340,11 @@ def bookings(request):
             create_notification("New Booking",f"New booking from {booking.guest_name}","booking")
 
             setting = AutoCloseSetting.objects.first()
-            if setting and setting.auto_close_booked_room:
-                if booking.room:
-                    booking.room.status = "OFF"
-                    booking.room.save()
+            if booking.booking_status == "confirmed":
+                if setting and setting.auto_close_booked_room:
+                    if booking.room:
+                        booking.room.status = "OFF"
+                        booking.room.save()
             return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -360,19 +355,53 @@ def bookings(request):
 @api_view(["PATCH"])
 @permission_classes([IsAdminUser])
 def update_booking_payment(request, booking_id):
+
     try:
         booking = Booking.objects.get(id=booking_id)
-        booking.payment_status = request.data.get(
-            "payment_status",
-            booking.payment_status
-        )
-        booking.save()
-        return Response({"message": "updated successfully"})
+
     except Booking.DoesNotExist:
         return Response(
             {"error": "Booking not found"},
             status=404
         )
+
+    payment_status = request.data.get("payment_status")
+
+    allowed_statuses = [
+        "unpaid",
+        "paid",
+        "failed",
+        "refunded",
+    ]
+
+    if payment_status not in allowed_statuses:
+        return Response(
+            {
+                "error": "Invalid payment status",
+                "allowed_statuses": allowed_statuses
+            },
+            status=400
+        )
+
+    booking.payment_status = payment_status
+
+    if payment_status == "paid":
+        booking.booking_status = "confirmed"
+
+    elif payment_status in ["failed", "unpaid"]:
+        if booking.booking_status != "cancelled":
+            booking.booking_status = "pending"
+
+    elif payment_status == "refunded":
+        booking.booking_status = "cancelled"
+
+    booking.save()
+
+    return Response({
+        "message": "Booking payment updated successfully",
+        "booking_status": booking.booking_status,
+        "payment_status": booking.payment_status,
+    })
 
 
 
@@ -2143,32 +2172,84 @@ def customer_records(request):
 
 
 
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def fake_payment(request, booking_id):
+
     try:
         booking = Booking.objects.get(id=booking_id)
+
     except Booking.DoesNotExist:
         return Response(
             {"error": "Booking not found"},
             status=404
         )
-    card_number = request.data.get("card_number", "").replace(" ", "")
+
+    # لا تسمح بالدفع إذا كان الحجز ملغى
+    if booking.booking_status == "cancelled":
+        return Response(
+            {"error": "This booking has been cancelled"},
+            status=400
+        )
+
+    # لا تسمح بالدفع إذا انتهت مدة الـ 24 ساعة
+    if booking.expires_at and booking.expires_at <= timezone.now():
+        booking.booking_status = "cancelled"
+        booking.save(update_fields=["booking_status"])
+
+        return Response(
+            {"error": "This booking has expired"},
+            status=400
+        )
+
+    # إذا كان الحجز مؤكد ومدفوع مسبقاً
+    if booking.booking_status == "confirmed":
+        return Response(
+            {"error": "This booking is already confirmed"},
+            status=400
+        )
+
+    card_number = request.data.get(
+        "card_number",
+        ""
+    ).replace(" ", "")
+
+    # نجاح الدفع التجريبي
     if card_number == "4242424242424242":
+
         booking.payment_status = "paid"
         booking.payment_method = "online"
+        booking.booking_status = "confirmed"
+
         booking.save()
+
+        setting = AutoCloseSetting.objects.first()
+
+        if setting and setting.auto_close_booked_room:
+            if booking.room:
+                booking.room.status = "OFF"
+                booking.room.save()
+
         return Response({
             "message": "Payment successful",
-            "payment_status": booking.payment_status
+            "booking_status": booking.booking_status,
+            "payment_status": booking.payment_status,
+            "booking_id": booking.id,
         })
+
+    # فشل الدفع
     booking.payment_status = "failed"
     booking.payment_method = "online"
+
     booking.save()
+
     return Response(
         {
             "error": "Payment failed",
-            "payment_status": booking.payment_status
+            "booking_status": booking.booking_status,
+            "payment_status": booking.payment_status,
         },
         status=400
     )
@@ -2218,6 +2299,45 @@ def update_booking_notes(request, booking_id):
         "notes": booking.notes
     })
 
+
+
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAdminUser])
+def update_booking_status(request, booking_id):
+
+    try:
+        booking = Booking.objects.get(id=booking_id)
+    except Booking.DoesNotExist:
+        return Response(
+            {"error": "Booking not found"},
+            status=404
+        )
+
+    new_status = request.data.get("booking_status")
+
+    allowed_statuses = [
+        "pending",
+        "confirmed",
+        "cancelled",
+    ]
+
+    if new_status not in allowed_statuses:
+        return Response(
+            {
+                "error": "Invalid booking status"
+            },
+            status=400
+        )
+
+    booking.booking_status = new_status
+    booking.save()
+
+    return Response({
+        "message": "Booking status updated successfully",
+        "booking_status": booking.booking_status,
+    })
 
 
 

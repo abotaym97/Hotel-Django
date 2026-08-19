@@ -85,6 +85,7 @@ urlpatterns = [
     path("admin/currencies/<int:pk>/", views.currency_detail),
     path("bookings/<int:booking_id>/details/", views.booking_detail),
     path("bookings/<int:booking_id>/notes/", views.update_booking_notes),
+    path("bookings/<int:booking_id>/status/", views.update_booking_status),
     path("bookings/<int:booking_id>/pay/",views.fake_payment),
     path("bookings/<int:booking_id>/",views.update_booking_payment),
     path("bookings/mark-all-read/",views.mark_all_bookings_read),

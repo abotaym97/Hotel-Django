@@ -7,8 +7,10 @@ from django.contrib.auth.models import User
 from .models import CustomerProfile,Amenity, Currency,HotelSettings,Notification,DashboardCardSetting,SystemSetting , CustomerRecord,MealOption
 from django.contrib.auth.models import User, Group
 from .models import PolicySetting,SocialMediaSetting
-
-
+from django.db.models import Q
+from django.utils import timezone
+from django.db.models import Q
+from django.utils import timezone
 
 
 
@@ -127,7 +129,9 @@ class BookingSerializer(serializers.ModelSerializer):
             'is_read',
             'meal_option',
             'meal_price',
+            'booking_status',
             'payment_status',
+            'expires_at',
             'payment_method',
             'total_price',
             "room_price",
@@ -177,7 +181,13 @@ class BookingSerializer(serializers.ModelSerializer):
         booked_rooms = Booking.objects.filter(
             room__room_type__name__iexact=room_type,
             check_in__lt=check_out,
-            check_out__gt=check_in
+            check_out__gt=check_in,
+        ).filter(
+            Q(booking_status="confirmed") |
+            Q(
+                booking_status="pending",
+                expires_at__gt=timezone.now()
+            )
         ).values_list('room_id', flat=True)
 
         available_room = Room.objects.filter(
@@ -535,7 +545,7 @@ class AdminProfileDetailSerializer(serializers.ModelSerializer):
             "total_bookings",
             "bookings",
         ]
-        read_only_fields = ["user", "username", "joined_at", "total_bookings", "bookings"]
+        read_only_fields = ['user','total_price','payment_status','booking_status','expires_at','booking_code',]
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop("user", {})
