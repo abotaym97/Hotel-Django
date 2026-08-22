@@ -106,6 +106,7 @@ class Booking(models.Model):
     room = models.ForeignKey(Room , on_delete=models.CASCADE)
     check_in = models.DateField()
     check_out = models.DateField()
+    nights = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     booking_code = models.CharField(max_length=20,unique=True,blank=True,null=True)
     review_used = models.BooleanField(default=False)
@@ -120,9 +121,9 @@ class Booking(models.Model):
     payment_method = models.CharField(max_length=50,choices=[("hotel", "Pay at Hotel"),("online", "Online Payment"),],default="hotel")
     total_price = models.DecimalField(max_digits=10,decimal_places=2,default=0)
     notes = models.TextField(blank=True, null=True)
-
-
-
+    confirmation_email_sent = models.BooleanField(default=False)
+    reception_email_sent = models.BooleanField(default=False)
+    confirmed_by = models.CharField(max_length=150,blank=True,null=True)
 
 
     def save(self, *args, **kwargs):

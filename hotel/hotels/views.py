@@ -4,6 +4,8 @@ from rest_framework.decorators import api_view, parser_classes , permission_clas
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated , IsAdminUser , AllowAny
 from rest_framework import status
+
+from .utils import send_booking_confirmation_email , send_reception_booking_notification
 from .serializers import ActivityLogSerializer, GalleryImageSerializer, RegisterSerializer, RestaurantSerializer, ReviewSerializer, RoomTypeSerializer , UserSerializer
 from .models import ActivityLog, GalleryImage, Hotel, NearbyPlace, Profile, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service , Gallery
 from .serializers import HotelSerializer , RoomSerializer , BookingSerializer , BookingSettingsSerializer
@@ -319,9 +321,12 @@ def bookings(request):
             room = serializer.validated_data["room"]
             nights = (check_out - check_in).days
             room_price = room.room_type.price
-            total_price = (room_price * nights) + meal_price
+            room_total = room_price * nights
+            meal_total = meal_price * nights
+            total_price = room_total + meal_total
             booking = serializer.save(
                 user=request.user if request.user.is_authenticated else None,
+                nights=nights,
                 meal_price=meal_price,
                 total_price=total_price,
                 booking_status="pending",
@@ -2222,9 +2227,23 @@ def fake_payment(request, booking_id):
         booking.payment_status = "paid"
         booking.payment_method = "online"
         booking.booking_status = "confirmed"
-
+        booking.confirmed_by = "Online"
         booking.save()
 
+        try:
+            send_booking_confirmation_email(booking)
+        except Exception as e:
+            print(f"Confirmation email failed for booking {booking.id}: {e}")
+
+
+        try:
+            send_reception_booking_notification(booking)
+        except Exception as e:
+            print(
+                f"Reception notification email failed "
+                f"for booking {booking.id}: {e}"
+            )
+    
         setting = AutoCloseSetting.objects.first()
 
         if setting and setting.auto_close_booked_room:
@@ -2333,6 +2352,27 @@ def update_booking_status(request, booking_id):
 
     booking.booking_status = new_status
     booking.save()
+
+    if new_status == "confirmed":
+
+        booking.confirmed_by = request.user.username
+        booking.save()
+
+        try:
+            send_booking_confirmation_email(booking)
+        except Exception as e:
+            print(
+                f"Confirmation email failed for booking "
+                f"{booking.id}: {e}"
+            )
+        try:
+            send_reception_booking_notification(booking)
+        except Exception as e:
+            print(
+                f"Reception notification email failed "
+                f"for booking {booking.id}: {e}"
+            )
+    
 
     return Response({
         "message": "Booking status updated successfully",

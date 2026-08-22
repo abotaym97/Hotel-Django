@@ -95,16 +95,18 @@ class BookingSerializer(serializers.ModelSerializer):
     room_number = serializers.CharField(source='room.room_number', read_only=True)
     room_type_display = serializers.CharField(source='room.room_type', read_only=True)
     room_type = serializers.CharField(write_only=True)
-    room = serializers.PrimaryKeyRelatedField(
-        queryset=Room.objects.all(),
-        required=False
-)
+    room = serializers.PrimaryKeyRelatedField(queryset=Room.objects.all(),required=False)
     room_price = serializers.SerializerMethodField()
+    meal_name = serializers.CharField(source='meal_option.name',read_only=True)
+    room_type_image = serializers.SerializerMethodField()
 
     def get_room_price(self, obj):
         return obj.room.room_type.price if obj.room and obj.room.room_type else 0
 
-
+    def get_room_type_image(self, obj):
+        if obj.room and obj.room.room_type and obj.room.room_type.image:
+            return obj.room.room_type.image.url
+        return None
 
     class Meta:
         model = Booking
@@ -129,6 +131,8 @@ class BookingSerializer(serializers.ModelSerializer):
             'is_read',
             'meal_option',
             'meal_price',
+            'meal_name',
+            'nights',
             'booking_status',
             'payment_status',
             'expires_at',
@@ -136,6 +140,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'total_price',
             "room_price",
             "notes",
+            'room_type_image',
         ]
         read_only_fields = ['user' , 'total_price', 'payment_status']
 
