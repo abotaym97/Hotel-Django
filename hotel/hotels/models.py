@@ -169,9 +169,29 @@ class CustomerProfile(models.Model):
 
 
 class Profile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    phone = models.CharField(max_length=30)
-    country = models.CharField(max_length=100)
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="profile"
+    )
+
+    phone = models.CharField(
+        max_length=30,
+        blank=True,
+        default=""
+    )
+
+    country = models.CharField(
+        max_length=100,
+        blank=True,
+        default=""
+    )
+
+    address = models.CharField(
+        max_length=255,
+        blank=True,
+        default=""
+    )
 
     def __str__(self):
         return self.user.username

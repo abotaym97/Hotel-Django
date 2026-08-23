@@ -270,7 +270,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             first_name=full_name
         )
 
-        CustomerProfile.objects.create(
+        Profile.objects.create(
             user=user,
             phone=phone,
             country=country

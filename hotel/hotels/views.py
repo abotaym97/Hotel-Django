@@ -530,28 +530,180 @@ def my_bookings(request):
     return Response(serializer.data)
 
 
-@api_view(['GET'])
+@api_view(["GET", "PUT", "PATCH"])
 @permission_classes([IsAuthenticated])
 def profile(request):
+
     profile, created = Profile.objects.get_or_create(
         user=request.user,
         defaults={
             "phone": "",
-            "country": ""
+            "country": "",
+            "address": "",
         }
     )
 
-    data = {
-        "first_name": request.user.first_name or request.user.username,
+    if request.method == "GET":
+
+        return Response({
+            "id": request.user.id,
+            "first_name": request.user.first_name,
+            "last_name": request.user.last_name,
+            "email": request.user.email,
+            "phone": profile.phone,
+            "country": profile.country,
+            "address": profile.address,
+        })
+
+    # UPDATE PROFILE
+
+    first_name = request.data.get(
+        "first_name",
+        request.user.first_name
+    )
+
+    last_name = request.data.get(
+        "last_name",
+        request.user.last_name
+    )
+
+    email = request.data.get(
+        "email",
+        request.user.email
+    )
+
+    phone = request.data.get(
+        "phone",
+        profile.phone
+    )
+
+    country = request.data.get(
+        "country",
+        profile.country
+    )
+
+    address = request.data.get(
+        "address",
+        profile.address
+    )
+
+    # Check email uniqueness
+    if (
+        email != request.user.email
+        and User.objects.filter(email=email).exclude(
+            id=request.user.id
+        ).exists()
+    ):
+        return Response(
+            {
+                "email": "This email is already in use."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    request.user.first_name = first_name
+    request.user.last_name = last_name
+    request.user.email = email
+
+    # Your system uses email as username
+    request.user.username = email
+
+    request.user.save()
+
+    profile.phone = phone
+    profile.country = country
+    profile.address = address
+
+    profile.save()
+
+    return Response({
+        "message": "Profile updated successfully.",
+        "first_name": request.user.first_name,
+        "last_name": request.user.last_name,
         "email": request.user.email,
         "phone": profile.phone,
         "country": profile.country,
-        "is_staff": request.user.is_staff,
-    }
+        "address": profile.address,
+    })
 
-    # create_log(request.user, "Viewed Profile", request.user.id)
 
-    return Response(data)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+
+    user = request.user
+
+    # Delete user account
+    user.delete()
+
+    return Response(
+        {
+            "message": "Account deleted successfully."
+        },
+        status=status.HTTP_200_OK
+    )
+
+
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+
+    current_password = request.data.get("current_password")
+    new_password = request.data.get("new_password")
+    confirm_password = request.data.get("confirm_password")
+
+    if not current_password:
+        return Response(
+            {"error": "Current password is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not new_password:
+        return Response(
+            {"error": "New password is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if new_password != confirm_password:
+        return Response(
+            {"error": "Passwords do not match."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not request.user.check_password(current_password):
+        return Response(
+            {"error": "Current password is incorrect."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if len(new_password) < 8:
+        return Response(
+            {"error": "Password must contain at least 8 characters."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    request.user.set_password(new_password)
+    request.user.save()
+
+    return Response({
+        "message": "Password updated successfully."
+    })
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @api_view(['GET'])
@@ -592,10 +744,6 @@ def register(request):
 
     if serializer.is_valid():
         user = serializer.save()
-        profile = Profile.objects.create(
-            user=user,
-            phone=request.data.get('phone'),
-            country=request.data.get('country'))
         create_log(user, "Created Profile", user.email)
         return Response(
             serializer.data,
@@ -762,11 +910,53 @@ def all_bookings(request):
 
 
 
+#لإلغاء الحجز
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cancel_booking(request, pk):
+    try:
+        booking = Booking.objects.get(id=pk)
+    except Booking.DoesNotExist:
+        return Response(
+            {"error": "Booking not found"},
+            status=404
+        )
+
+    if booking.user != request.user and not request.user.is_staff:
+        return Response(
+            {"error": "Not allowed"},
+            status=403
+        )
+
+    if booking.booking_status == "cancelled":
+        return Response(
+            {"error": "Booking is already cancelled"},
+            status=400
+        )
+
+    booking.booking_status = "cancelled"
+    booking.save(update_fields=["booking_status"])
+
+    create_log(
+        request.user,
+        "Cancelled Booking",
+        booking.id
+    )
+
+    create_notification(
+        "Booking Cancelled",
+        f"Booking #{booking.id} was cancelled",
+        "cancel"
+    )
+
+    return Response({
+        "message": "Booking cancelled successfully",
+        "booking_status": booking.booking_status,
+        "booking_id": booking.id
+    })
 
 
-
-
-# لإلغاء الحجز
+# لحذف الحجز
 @api_view(['DELETE'])
 @permission_classes([IsAdminUser])
 def delete_booking(request, pk):

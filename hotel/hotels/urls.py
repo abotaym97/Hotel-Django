@@ -1,6 +1,6 @@
 from . import views
 from django.urls import path
-from .views import booking_settings,admin_restaurants,toggle_maintenance,site_status,auto_close_setting,dashboard_occupancy,notification_detail,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
+from .views import booking_settings,admin_restaurants, cancel_booking,toggle_maintenance,site_status,auto_close_setting,dashboard_occupancy,notification_detail,all_bookings,dashboard_stats, delete_booking, delete_room, get_hotels , get_rooms , bookings , available_rooms , booking_detail , register , my_bookings , profile, hotel_detail, room_types, rooms_by_hotel, update_room
 
 
 urlpatterns = [
@@ -8,7 +8,7 @@ urlpatterns = [
     path('rooms/' , get_rooms),
     path('bookings/' , bookings),
     path('available_rooms/',available_rooms),
-    path('bookings/<int:id>/', booking_detail),
+    path('bookings/<int:booking_id>/', booking_detail),
     path('register/', register),
     path('my-bookings/', my_bookings),
     path('profile/', profile),
@@ -21,6 +21,7 @@ urlpatterns = [
     path('rooms/<int:pk>/delete/', delete_room),
     path('rooms/<int:pk>/update/', update_room),
     path('bookings/<int:pk>/delete/', delete_booking),
+    path("bookings/<int:pk>/cancel/",cancel_booking,name="cancel_booking"),
     path('room-types/', room_types),
     path("room-types/<int:pk>/", views.room_type_detail),
     path("admin/room-types/<int:pk>/", views.admin_room_type_detail),
@@ -105,5 +106,8 @@ urlpatterns = [
     path("admin/policy-settings/", views.policy_settings),
     path("social-settings/", views.public_social_settings),
     path("admin/social-settings/", views.social_settings),
+    path("profile/", views.profile),
+    path("change-password/", views.change_password),
+    path("delete-account/", views.delete_account),
 ]
 
