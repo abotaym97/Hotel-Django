@@ -7,7 +7,7 @@ from rest_framework import status
 
 from .utils import send_booking_confirmation_email , send_reception_booking_notification
 from .serializers import ActivityLogSerializer, GalleryImageSerializer, RegisterSerializer, RestaurantSerializer, ReviewSerializer, RoomTypeSerializer , UserSerializer
-from .models import ActivityLog, GalleryImage, Hotel, NearbyPlace, Profile, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service , Gallery
+from .models import ActivityLog, GalleryImage, Hotel, NearbyPlace, Profile, Restaurant, Review ,Payment, Room , Booking , BookingSettings, RoomType, Service , Gallery
 from .serializers import HotelSerializer , RoomSerializer , BookingSerializer , BookingSettingsSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
@@ -333,6 +333,22 @@ def bookings(request):
                 payment_status="unpaid",
                 expires_at=timezone.now() + timedelta(hours=24)
             )
+
+
+            payment = None
+
+            if booking.payment_method == "online":
+                payment = Payment.objects.create(
+                    booking=booking,
+                    gateway="test",
+                    external_reference=booking.booking_code,
+                    amount=total_price,
+                    currency="IQD",
+                    status="pending"
+                )
+
+
+
             
             CustomerRecord.objects.create(
                 name=booking.guest_name,
@@ -350,7 +366,16 @@ def bookings(request):
                     if booking.room:
                         booking.room.status = "OFF"
                         booking.room.save()
-            return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
+            return Response({
+                "booking": BookingSerializer(booking).data,
+                "payment": {
+                    "id": payment.id,
+                    "status": payment.status,
+                    "amount": str(payment.amount),
+                    "currency": payment.currency,
+                    "payment_url": f"/api/payments/test/{payment.id}/"
+                }
+            }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -553,6 +578,7 @@ def profile(request):
             "phone": profile.phone,
             "country": profile.country,
             "address": profile.address,
+            "is_staff": request.user.is_staff,
         })
 
     # UPDATE PROFILE
@@ -2414,11 +2440,28 @@ def fake_payment(request, booking_id):
     # نجاح الدفع التجريبي
     if card_number == "4242424242424242":
 
+        payment = Payment.objects.filter(
+            booking=booking,
+            status="pending"
+        ).order_by("-created_at").first()
+
         booking.payment_status = "paid"
         booking.payment_method = "online"
         booking.booking_status = "confirmed"
         booking.confirmed_by = "Online"
         booking.save()
+
+        if payment:
+            payment.status = "paid"
+            payment.paid_at = timezone.now()
+            payment.transaction_id = f"TEST-{booking.booking_code}"
+            payment.save(
+                update_fields=[
+                    "status",
+                    "paid_at",
+                    "transaction_id",
+                ]
+            )
 
         try:
             send_booking_confirmation_email(booking)

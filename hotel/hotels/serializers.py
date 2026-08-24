@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ActivityLog, Gallery, GalleryImage, HeroSlide, Hotel, NearbyPlace, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service
+from .models import ActivityLog, Gallery, GalleryImage, HeroSlide, Hotel, NearbyPlace, Payment, Restaurant, Review , Room , Booking , BookingSettings, RoomType, Service
 from django.contrib.auth.models import User
 from .models import BookingSettings ,Facility, ContactSetting , ContactMessage
 from datetime import timedelta
@@ -656,3 +656,44 @@ class SocialMediaSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = SocialMediaSetting
         fields = "__all__"
+
+
+
+
+
+
+
+
+
+
+
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = [
+            "id",
+            "booking",
+            "gateway",
+            "transaction_id",
+            "external_reference",
+            "amount",
+            "currency",
+            "status",
+            "created_at",
+            "paid_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "booking",
+            "gateway",
+            "transaction_id",
+            "external_reference",
+            "amount",
+            "currency",
+            "status",
+            "created_at",
+            "paid_at",
+        ]
