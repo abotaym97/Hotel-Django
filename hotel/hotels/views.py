@@ -40,7 +40,7 @@ from decimal import Decimal
 from datetime import datetime
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.utils import timezone
-
+from .zaincash import create_payment
 
 
 
@@ -340,7 +340,7 @@ def bookings(request):
             if booking.payment_method == "online":
                 payment = Payment.objects.create(
                     booking=booking,
-                    gateway="test",
+                    gateway="zaincash",
                     external_reference=booking.booking_code,
                     amount=total_price,
                     currency="IQD",
@@ -348,6 +348,40 @@ def bookings(request):
                 )
 
 
+                payment_url = None
+
+
+                try:
+                    zain_response = create_payment(
+                        booking_id=booking.id,
+                        amount=total_price,
+                        success_url="http://localhost:3000/payment-success",
+                        failure_url="http://localhost:3000/payment-failed",
+                        
+                    )
+
+                    transaction_details = zain_response.get("transactionDetails", {})
+
+                    payment.transaction_id = transaction_details.get("transactionId")
+                    payment.external_reference = transaction_details.get(
+                        "externalReferenceId",
+                        booking.booking_code
+                    )
+                    payment.save()
+
+                    payment_url = transaction_details.get("redirectUrl")
+
+                except Exception as e:
+                    payment.status = "failed"
+                    payment.save(update_fields=["status"])
+
+                    return Response(
+                        {
+                            "error": "Unable to initialize ZainCash payment",
+                            "details": str(e),
+                        },
+                        status=502
+                    )
 
             
             CustomerRecord.objects.create(
@@ -373,7 +407,7 @@ def bookings(request):
                     "status": payment.status,
                     "amount": str(payment.amount),
                     "currency": payment.currency,
-                    "payment_url": f"/api/payments/test/{payment.id}/"
+                    "payment_url": payment_url
                 }
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -2882,3 +2916,128 @@ def social_settings(request):
         return Response(serializer.data)
 
     return Response(serializer.errors, status=400)
+
+
+
+
+
+
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def zaincash_payment(request, booking_id):
+
+    try:
+        booking = Booking.objects.get(id=booking_id)
+    except Booking.DoesNotExist:
+        return Response(
+            {"error": "Booking not found"},
+            status=404
+        )
+
+    # لا تسمح بالدفع إذا الحجز ملغي
+    if booking.booking_status == "cancelled":
+        return Response(
+            {"error": "This booking has been cancelled"},
+            status=400
+        )
+
+    # لا تسمح بالدفع إذا انتهت مدة الحجز
+    if booking.expires_at and booking.expires_at <= timezone.now():
+        booking.booking_status = "cancelled"
+        booking.save(update_fields=["booking_status"])
+
+        return Response(
+            {"error": "This booking has expired"},
+            status=400
+        )
+
+    # إذا مدفوع مسبقاً
+    if booking.payment_status == "paid":
+        return Response(
+            {"error": "This booking is already paid"},
+            status=400
+        )
+
+    # Payment الموجود أصلاً عند إنشاء الحجز
+    payment = Payment.objects.filter(
+        booking=booking,
+        status="pending"
+    ).order_by("-created_at").first()
+
+    if not payment:
+        return Response(
+            {"error": "Pending payment not found"},
+            status=400
+        )
+
+    # روابط الرجوع بعد الدفع
+    success_url = (
+        f"http://localhost:3000/payment-success/{booking.id}"
+    )
+
+    failure_url = (
+        f"http://localhost:3000/payment-failed/{booking.id}"
+    )
+
+    try:
+
+        result = create_payment(
+            booking_id=booking.id,
+            amount=booking.total_price,
+            success_url=success_url,
+            failure_url=failure_url,
+            
+        )
+
+        transaction_details = result.get(
+            "transactionDetails",
+            {}
+        )
+
+        transaction_id = transaction_details.get(
+            "transactionId"
+        )
+
+        external_reference = transaction_details.get(
+            "externalReferenceId"
+        )
+
+        redirect_url = result.get("redirectUrl")
+
+        if not redirect_url:
+            return Response(
+                {
+                    "error": "ZainCash did not return redirect URL",
+                    "zaincash_response": result,
+                },
+                status=400
+            )
+
+        # تحديث Payment الموجود
+        payment.gateway = "zaincash"
+        payment.transaction_id = transaction_id
+        payment.external_reference = external_reference
+        payment.status = "pending"
+        payment.save()
+
+        return Response({
+            "success": True,
+            "redirect_url": redirect_url,
+            "transaction_id": transaction_id,
+            "external_reference": external_reference,
+            "booking_id": booking.id,
+        })
+
+    except Exception as e:
+
+        print("ZainCash payment error:", e)
+
+        return Response(
+            {
+                "success": False,
+                "error": str(e),
+            },
+            status=400
+        )

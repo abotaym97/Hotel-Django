@@ -160,3 +160,10 @@ EMAIL_HOST_PASSWORD = "xydg zkcp ozkw jfwh"
 DEFAULT_FROM_EMAIL = "NajafDo Hotel <najafdo2025@gmail.com>"
 
 RECEPTION_EMAIL = "it@najafdohotel.com"
+
+
+
+
+# ZainCash UAT
+ZAINCASH_CLIENT_ID = "758055f4a8044779a35f6ceb69f858b3"
+ZAINCASH_CLIENT_SECRET = "bibLCGTxVAig5To3OLLKPJQMlRR7Pefp"
