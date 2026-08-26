@@ -90,6 +90,7 @@ urlpatterns = [
     path("bookings/<int:booking_id>/status/", views.update_booking_status),
     path("bookings/<int:booking_id>/pay/",views.fake_payment),
     path("bookings/<int:booking_id>/",views.update_booking_payment),
+    path("bookings/<int:booking_id>/zaincash/verify/",views.zaincash_verify_payment,),
     path("bookings/mark-all-read/",views.mark_all_bookings_read),
     path("hero-slides/", views.active_hero_slides),
     path("admin-hero-slides/", views.admin_hero_slides),
@@ -110,5 +111,6 @@ urlpatterns = [
     path("profile/", views.profile),
     path("change-password/", views.change_password),
     path("delete-account/", views.delete_account),
+    path("bookings/<int:booking_id>/payment-success/",views.public_payment_booking,),
 ]
 
