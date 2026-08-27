@@ -557,3 +557,18 @@ class Payment(models.Model):
         blank=True,
         null=True
     )
+    zaincash_token_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
+    zaincash_token_used = models.BooleanField(
+        default=False
+    )
+
+    zaincash_token_used_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )

@@ -42,6 +42,25 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.utils import timezone
 from .zaincash import create_payment , inquiry_payment  ,verify_zaincash_callback_token
 from decimal import Decimal
+from django.db import transaction
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.decorators import throttle_classes
+from rest_framework.throttling import AnonRateThrottle
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def create_notification(title, message, notification_type):
@@ -2971,10 +2990,16 @@ def zaincash_payment(request, booking_id):
             {"error": "Pending payment not found"},
             status=400
         )
+    signer = TimestampSigner()
 
+    payment_access_token = signer.sign_object({
+        "booking_id": booking.id,
+        "payment_id": payment.id,
+    })
     # روابط الرجوع بعد الدفع
     success_url = (
-        f"http://localhost:3000/payment-success/{booking.id}"
+        f"http://localhost:3000/payment-success/"
+        f"{booking.id}?access_token={payment_access_token}"
     )
 
     failure_url = (
@@ -3047,18 +3072,77 @@ def zaincash_payment(request, booking_id):
 
 
 
+# @api_view(["GET"])
+# @permission_classes([AllowAny])
+# def public_payment_booking(request, booking_id):
+#     try:
+#         booking = Booking.objects.get(id=booking_id)
+#     except Booking.DoesNotExist:
+#         return Response(
+#             {"error": "Booking not found"},
+#             status=404
+#         )
+
+#     # لا نعرض الحجز إلا إذا كان الدفع ناجحاً
+#     if booking.payment_status != "paid":
+#         return Response(
+#             {"error": "Payment has not been confirmed"},
+#             status=400
+#         )
+
+#     serializer = BookingSerializer(booking)
+#     return Response(serializer.data)
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def public_payment_booking(request, booking_id):
+
+    access_token = request.query_params.get("access_token")
+
+    if not access_token:
+        return Response(
+            {"error": "Payment access token is required"},
+            status=401
+        )
+
+    signer = TimestampSigner()
+
+    try:
+        data = signer.unsign_object(
+            access_token,
+            max_age=60 * 60 * 24
+        )
+
+    except SignatureExpired:
+        return Response(
+            {"error": "Payment access token has expired"},
+            status=401
+        )
+
+    except BadSignature:
+        return Response(
+            {"error": "Invalid payment access token"},
+            status=401
+        )
+
+    # تأكد أن التوكن خاص بهذا الحجز
+    if str(data.get("booking_id")) != str(booking_id):
+        return Response(
+            {"error": "Invalid payment access token"},
+            status=401
+        )
+
     try:
         booking = Booking.objects.get(id=booking_id)
+
     except Booking.DoesNotExist:
         return Response(
             {"error": "Booking not found"},
             status=404
         )
 
-    # لا نعرض الحجز إلا إذا كان الدفع ناجحاً
+    # لا نعرض الحجز قبل نجاح الدفع
     if booking.payment_status != "paid":
         return Response(
             {"error": "Payment has not been confirmed"},
@@ -3066,9 +3150,8 @@ def public_payment_booking(request, booking_id):
         )
 
     serializer = BookingSerializer(booking)
+
     return Response(serializer.data)
-
-
 
 
 
@@ -3267,20 +3350,1675 @@ def public_payment_booking(request, booking_id):
 #     })
 
 
+# @api_view(["GET"])
+# @permission_classes([AllowAny])
+# def zaincash_verify_payment(request, booking_id):
+#     """
+#     Securely verify a ZainCash payment.
+
+#     The booking is confirmed ONLY if the ZainCash inquiry confirms:
+#     - transaction status = SUCCESS
+#     - transaction ID matches our Payment
+#     - external reference matches our Payment
+#     - order ID matches our booking ID
+#     - amount matches our Payment amount
+#     - currency matches our Payment currency
+#     """
+
+#     token = request.query_params.get("token")
+
+#     if not token:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Missing ZainCash payment token"
+#             },
+#             status=400
+#         )
+
+#     # =====================================================
+#     # VERIFY ZAINCASH JWT
+#     # =====================================================
+
+#     try:
+
+#         token_payload = verify_zaincash_callback_token(
+#             token
+#         )
+
+#     except ValueError as e:
+
+#         print(
+#             "SECURITY ALERT: Invalid ZainCash callback token"
+#         )
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Invalid or expired payment token"
+#             },
+#             status=401
+#         )
+
+#     # =====================================================
+#     # 1. Get booking
+#     # =====================================================
+
+#     try:
+#         booking = Booking.objects.get(id=booking_id)
+
+#     except Booking.DoesNotExist:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Booking not found"
+#             },
+#             status=404
+#         )
+
+#         # =====================================================
+#     # VERIFY TOKEN DATA AGAINST BOOKING
+#     # =====================================================
+
+#     token_data = token_payload.get("data", token_payload)
+
+#     token_transaction_id = str(
+#         token_data.get(
+#             "transactionId",
+#             ""
+#         )
+#     ).strip()
+
+#     token_order_id = str(
+#         token_data.get(
+#             "orderId",
+#             ""
+#         )
+#     ).strip()
+
+#     token_external_reference = str(
+#         token_data.get(
+#             "merchantReferenceId",
+#             token_data.get(
+#                 "externalReferenceId",
+#                 ""
+#             )
+#         )
+#     ).strip()
+
+#     token_status = str(
+#         token_data.get(
+#             "currentStatus",
+#             token_data.get(
+#                 "status",
+#                 ""
+#             )
+#         )
+#     ).upper()
+
+#     token_amount_data = token_data.get(
+#         "amount",
+#         {}
+#     )
+
+#     token_amount = token_amount_data.get(
+#         "value"
+#     )
+
+#     token_currency = str(
+#         token_amount_data.get(
+#             "currency",
+#             ""
+#         )
+#     ).upper()
+
+
+
+#     # =====================================================
+#     # 2. Get ZainCash payment for this booking
+#     # =====================================================
+
+#     payment = (
+#         Payment.objects
+#         .filter(
+#             booking=booking,
+#             gateway="zaincash"
+#         )
+#         .order_by("-created_at")
+#         .first()
+#     )
+
+#     if not payment:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "ZainCash payment not found"
+#             },
+#             status=404
+#         )
+
+
+
+
+#         # =====================================================
+#     # TOKEN ↔ DATABASE VERIFICATION
+#     # =====================================================
+
+#     if token_order_id != str(booking.id):
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Payment order verification failed"
+#             },
+#             status=400
+#         )
+
+#     if token_transaction_id != str(
+#         payment.transaction_id
+#     ).strip():
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Payment transaction verification failed"
+#             },
+#             status=400
+#         )
+
+#     stored_external_reference = str(
+#         payment.external_reference or ""
+#     ).strip()
+
+#     if not token_external_reference:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Payment reference missing from token"
+#             },
+#             status=400
+#         )
+
+#     if (
+#         not stored_external_reference
+#         or token_external_reference != stored_external_reference
+#     ):
+#         print(
+#             "SECURITY ALERT: External reference mismatch",
+#             {
+#                 "booking_id": booking.id,
+#                 "stored": stored_external_reference,
+#                 "returned": token_external_reference,
+#             }
+#         )
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Payment reference verification failed"
+#             },
+#             status=400
+#         )
+
+        
+
+    
+
+#     try:
+
+#         if token_amount is None:
+#             raise ValueError()
+
+#         if Decimal(str(token_amount)) != Decimal(
+#             str(payment.amount)
+#         ):
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment amount verification failed"
+#                 },
+#                 status=400
+#             )
+
+#     except Exception:
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Invalid payment amount"
+#             },
+#             status=400
+#         )
+
+
+#     if token_currency != str(
+#         payment.currency
+#     ).upper():
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Payment currency verification failed"
+#             },
+#             status=400
+#         )
+
+
+
+
+
+#     # =====================================================
+#     # 3. Make sure we have our original transaction ID
+#     # =====================================================
+
+#     if not payment.transaction_id:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "ZainCash transaction ID is missing"
+#             },
+#             status=400
+#         )
+
+#     # =====================================================
+#     # 4. If already successfully paid
+#     # =====================================================
+
+#     if (
+#         payment.status == "paid"
+#         and booking.payment_status == "paid"
+#         and booking.booking_status == "confirmed"
+#     ):
+#         return Response(
+#             {
+#                 "success": True,
+#                 "payment_status": "paid",
+#                 "booking_status": "confirmed",
+#                 "booking": BookingSerializer(booking).data,
+#             }
+#         )
+
+#     # =====================================================
+#     # 5. Ask ZainCash directly
+#     # =====================================================
+
+#     try:
+
+#         zain_response = inquiry_payment(
+#             payment.transaction_id
+#         )
+
+#     except Exception as e:
+
+#         print(
+#             f"ZainCash inquiry failed for booking "
+#             f"{booking.id}: {e}"
+#         )
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Unable to verify payment with ZainCash",
+#             },
+#             status=502
+#         )
+
+#     print("ZainCash final inquiry:", zain_response)
+
+#     # =====================================================
+#     # 6. Extract ZainCash response
+#     # =====================================================
+
+#     transaction_status = str(
+#         zain_response.get("status", "")
+#     ).upper()
+
+#     transaction_details = zain_response.get(
+#         "transactionDetails",
+#         {}
+#     )
+
+#     # Some responses may contain status inside transactionDetails
+#     if not transaction_status:
+
+#         transaction_status = str(
+#             transaction_details.get("status", "")
+#         ).upper()
+
+#     # =====================================================
+#     # 7. If transaction is not SUCCESS
+#     # =====================================================
+
+#     if transaction_status != "SUCCESS":
+
+#         if transaction_status in [
+#             "FAILED",
+#             "EXPIRED",
+#             "REFUNDED"
+#         ]:
+
+#             payment.status = "failed"
+#             payment.save(
+#                 update_fields=["status"]
+#             )
+
+#             booking.payment_status = "failed"
+
+#             if booking.booking_status != "cancelled":
+#                 booking.booking_status = "pending"
+
+#             booking.save(
+#                 update_fields=[
+#                     "payment_status",
+#                     "booking_status"
+#                 ]
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "payment_status": "failed",
+#                     "booking_status": booking.booking_status,
+#                     "message": "ZainCash payment was not successful"
+#                 }
+#             )
+
+#         # Still pending / unknown status
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "payment_status": "pending",
+#                 "booking_status": booking.booking_status,
+#                 "message": "ZainCash payment is still pending"
+#             }
+#         )
+
+#     # =====================================================
+#     # 8. SUCCESS
+#     # Now verify EVERYTHING
+#     # =====================================================
+
+#     # -----------------------------------------------------
+#     # 8.1 Transaction ID
+#     # -----------------------------------------------------
+
+#     returned_transaction_id = str(
+#         transaction_details.get(
+#             "transactionId",
+#             ""
+#         )
+#     ).strip()
+
+#     stored_transaction_id = str(
+#         payment.transaction_id
+#     ).strip()
+
+#     if not returned_transaction_id:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "ZainCash did not return transaction ID"
+#             },
+#             status=400
+#         )
+
+#     if returned_transaction_id != stored_transaction_id:
+
+#         print(
+#             "SECURITY ALERT: Transaction ID mismatch",
+#             {
+#                 "booking_id": booking.id,
+#                 "stored": stored_transaction_id,
+#                 "returned": returned_transaction_id,
+#             }
+#         )
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Transaction verification failed"
+#             },
+#             status=400
+#         )
+
+#     # -----------------------------------------------------
+#     # 8.2 External Reference
+#     # -----------------------------------------------------
+
+#     returned_external_reference = str(
+#         transaction_details.get(
+#             "externalReferenceId",
+#             ""
+#         )
+#     ).strip()
+
+#     stored_external_reference = str(
+#         payment.external_reference or ""
+#     ).strip()
+
+#     if not returned_external_reference:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "ZainCash did not return external reference"
+#             },
+#             status=400
+#         )
+
+#     if (
+#         not stored_external_reference
+#         or
+#         returned_external_reference != stored_external_reference
+#     ):
+
+#         print(
+#             "SECURITY ALERT: External reference mismatch",
+#             {
+#                 "booking_id": booking.id,
+#                 "stored": stored_external_reference,
+#                 "returned": returned_external_reference,
+#             }
+#         )
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Payment reference verification failed"
+#             },
+#             status=400
+#         )
+
+#     # -----------------------------------------------------
+#     # 8.3 Order ID
+#     # -----------------------------------------------------
+
+#     returned_order_id = str(
+#         transaction_details.get(
+#             "orderId",
+#             ""
+#         )
+#     ).strip()
+
+#     expected_order_id = str(
+#         booking.id
+#     ).strip()
+
+#     if not returned_order_id:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "ZainCash did not return order ID"
+#             },
+#             status=400
+#         )
+
+#     if returned_order_id != expected_order_id:
+
+#         print(
+#             "SECURITY ALERT: Order ID mismatch",
+#             {
+#                 "booking_id": booking.id,
+#                 "expected": expected_order_id,
+#                 "returned": returned_order_id,
+#             }
+#         )
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Order verification failed"
+#             },
+#             status=400
+#         )
+
+#     # -----------------------------------------------------
+#     # 8.4 Amount
+#     # -----------------------------------------------------
+
+#     zain_amount_data = transaction_details.get(
+#         "amount",
+#         {}
+#     )
+
+#     zain_amount_value = zain_amount_data.get(
+#         "value"
+#     )
+
+#     if zain_amount_value is None:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "ZainCash did not return payment amount"
+#             },
+#             status=400
+#         )
+
+#     try:
+
+#         zain_amount = Decimal(
+#             str(zain_amount_value)
+#         )
+
+#         expected_amount = Decimal(
+#             str(payment.amount)
+#         )
+
+#     except Exception:
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Invalid payment amount returned by ZainCash"
+#             },
+#             status=400
+#         )
+
+#     if zain_amount != expected_amount:
+
+#         print(
+#             "SECURITY ALERT: Amount mismatch",
+#             {
+#                 "booking_id": booking.id,
+#                 "expected": str(expected_amount),
+#                 "returned": str(zain_amount),
+#             }
+#         )
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Payment amount verification failed"
+#             },
+#             status=400
+#         )
+
+#     # -----------------------------------------------------
+#     # 8.5 Currency
+#     # -----------------------------------------------------
+
+#     zain_currency = str(
+#         zain_amount_data.get(
+#             "currency",
+#             ""
+#         )
+#     ).upper().strip()
+
+#     expected_currency = str(
+#         payment.currency
+#     ).upper().strip()
+
+#     if zain_currency != expected_currency:
+
+#         print(
+#             "SECURITY ALERT: Currency mismatch",
+#             {
+#                 "booking_id": booking.id,
+#                 "expected": expected_currency,
+#                 "returned": zain_currency,
+#             }
+#         )
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Payment currency verification failed"
+#             },
+#             status=400
+#         )
+
+#     # =====================================================
+#     # 9. EVERYTHING MATCHED
+#     # Now and ONLY now confirm payment
+#     # =====================================================
+
+#     payment.status = "paid"
+#     payment.paid_at = timezone.now()
+
+#     # Keep original transaction ID
+#     payment.transaction_id = stored_transaction_id
+
+#     payment.save()
+
+#     # -----------------------------------------------------
+#     # Confirm booking
+#     # -----------------------------------------------------
+
+#     booking.payment_status = "paid"
+#     booking.payment_method = "online"
+#     booking.booking_status = "confirmed"
+#     booking.confirmed_by = "ZainCash"
+
+#     booking.save()
+
+#     # =====================================================
+#     # 10. Send confirmation email
+#     # =====================================================
+
+#     try:
+
+#         send_booking_confirmation_email(
+#             booking
+#         )
+
+#     except Exception as e:
+
+#         print(
+#             f"Confirmation email failed for booking "
+#             f"{booking.id}: {e}"
+#         )
+
+#     # =====================================================
+#     # 11. Send reception notification
+#     # =====================================================
+
+#     try:
+
+#         send_reception_booking_notification(
+#             booking
+#         )
+
+#     except Exception as e:
+
+#         print(
+#             f"Reception notification email failed "
+#             f"for booking {booking.id}: {e}"
+#         )
+
+#     # =====================================================
+#     # 12. Close room automatically
+#     # =====================================================
+
+#     setting = AutoCloseSetting.objects.first()
+
+#     if (
+#         setting
+#         and setting.auto_close_booked_room
+#         and booking.room
+#     ):
+
+#         booking.room.status = "OFF"
+#         booking.room.is_available = False
+
+#         booking.room.save()
+
+#     # =====================================================
+#     # 13. Final response
+#     # =====================================================
+
+#     return Response(
+#         {
+#             "success": True,
+#             "payment_status": "paid",
+#             "booking_status": "confirmed",
+#             "booking": BookingSerializer(
+#                 booking
+#             ).data,
+#             "transaction": zain_response,
+#         }
+#     )
+
+
+
+# @api_view(["GET"])
+# @permission_classes([AllowAny])
+# def zaincash_verify_payment(request, booking_id):
+#     """
+#     Securely verify a ZainCash payment.
+
+#     Booking is confirmed ONLY when:
+#     - JWT is valid and signed by ZainCash
+#     - JWT is not expired / not-before valid
+#     - JWT status indicates SUCCESS
+#     - token orderId matches booking ID
+#     - token transactionId matches our Payment
+#     - token externalReferenceId matches our Payment
+#     - token amount matches our Payment amount
+#     - token currency matches our Payment currency
+#     - ZainCash inquiry confirms SUCCESS
+#     - inquiry transactionId matches our Payment
+#     - inquiry externalReferenceId matches our Payment
+#     - inquiry orderId matches our Booking
+#     - inquiry amount matches our Payment
+#     - inquiry currency matches our Payment
+
+#     Replay protection:
+#     - Each callback token is hashed before storage
+#     - A used token can never be used again
+#     - select_for_update() prevents concurrent confirmation
+#     """
+
+#     import hashlib
+#     from decimal import Decimal
+
+#     token = request.query_params.get("token")
+
+#     if not token:
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Missing ZainCash payment token"
+#             },
+#             status=400
+#         )
+
+#     # =========================================================
+#     # 1. VERIFY ZAINCASH JWT
+#     # =========================================================
+
+#     try:
+#         token_payload = verify_zaincash_callback_token(token)
+
+#     except ValueError as e:
+#         print("SECURITY ALERT: Invalid ZainCash callback token")
+#         print("ZainCash token verification error:", str(e))
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Invalid or expired payment token"
+#             },
+#             status=401
+#         )
+
+#     # =========================================================
+#     # 2. CREATE TOKEN HASH
+#     # =========================================================
+
+#     token_hash = hashlib.sha256(
+#         token.encode("utf-8")
+#     ).hexdigest()
+
+#     # =========================================================
+#     # 3. EXTRACT TOKEN DATA
+#     # =========================================================
+
+#     token_data = token_payload.get(
+#         "data",
+#         token_payload
+#     )
+
+#     token_transaction_id = str(
+#         token_data.get(
+#             "transactionId",
+#             ""
+#         )
+#     ).strip()
+
+#     token_order_id = str(
+#         token_data.get(
+#             "orderId",
+#             ""
+#         )
+#     ).strip()
+
+#     token_external_reference = str(
+#         token_data.get(
+#             "merchantReferenceId",
+#             token_data.get(
+#                 "externalReferenceId",
+#                 ""
+#             )
+#         )
+#     ).strip()
+
+#     token_status = str(
+#         token_data.get(
+#             "currentStatus",
+#             token_data.get(
+#                 "status",
+#                 ""
+#             )
+#         )
+#     ).upper().strip()
+
+#     token_amount_data = token_data.get(
+#         "amount",
+#         {}
+#     )
+
+#     token_amount = token_amount_data.get(
+#         "value"
+#     )
+
+#     token_currency = str(
+#         token_amount_data.get(
+#             "currency",
+#             ""
+#         )
+#     ).upper().strip()
+
+#     # =========================================================
+#     # 4. VERIFY TOKEN STATUS
+#     # =========================================================
+
+#     if token_status != "SUCCESS":
+
+#         print(
+#             "SECURITY ALERT: Invalid ZainCash token status",
+#             {
+#                 "booking_id": booking_id,
+#                 "token_status": token_status,
+#             }
+#         )
+
+#         return Response(
+#             {
+#                 "success": False,
+#                 "error": "Payment token is not successful"
+#             },
+#             status=400
+#         )
+
+#     # =========================================================
+#     # 5. ATOMIC DATABASE TRANSACTION
+#     #
+#     # select_for_update() prevents two requests from
+#     # processing the same booking/payment simultaneously.
+#     # =========================================================
+
+#     with transaction.atomic():
+
+#         # -----------------------------------------------------
+#         # Lock booking row
+#         # -----------------------------------------------------
+
+#         try:
+#             booking = (
+#                 Booking.objects
+#                 .select_for_update()
+#                 .get(id=booking_id)
+#             )
+
+#         except Booking.DoesNotExist:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Booking not found"
+#                 },
+#                 status=404
+#             )
+
+#         # -----------------------------------------------------
+#         # Get and lock ZainCash payment
+#         # -----------------------------------------------------
+
+#         payment = (
+#             Payment.objects
+#             .select_for_update()
+#             .filter(
+#                 booking=booking,
+#                 gateway="zaincash"
+#             )
+#             .order_by("-created_at")
+#             .first()
+#         )
+
+#         if not payment:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "ZainCash payment not found"
+#                 },
+#                 status=404
+#             )
+
+#         # =====================================================
+#         # 6. REPLAY PROTECTION
+#         # =====================================================
+
+#         # If this exact token was already consumed,
+#         # NEVER process it again.
+
+#         if payment.zaincash_token_used:
+
+#             print(
+#                 "SECURITY ALERT: ZainCash token replay detected",
+#                 {
+#                     "booking_id": booking.id,
+#                     "payment_id": payment.id,
+#                     "transaction_id": payment.transaction_id,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment token has already been used"
+#                 },
+#                 status=409
+#             )
+
+#         # -----------------------------------------------------
+#         # Check whether this token was already used
+#         # by another payment.
+#         # -----------------------------------------------------
+
+#         existing_token_payment = (
+#             Payment.objects
+#             .filter(
+#                 zaincash_token_hash=token_hash,
+#                 zaincash_token_used=True
+#             )
+#             .exclude(id=payment.id)
+#             .first()
+#         )
+
+#         if existing_token_payment:
+
+#             print(
+#                 "SECURITY ALERT: ZainCash token reused on another payment",
+#                 {
+#                     "booking_id": booking.id,
+#                     "payment_id": payment.id,
+#                     "previous_payment_id": existing_token_payment.id,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment token has already been used"
+#                 },
+#                 status=409
+#             )
+
+#         # -----------------------------------------------------
+#         # If this payment already has a DIFFERENT token hash,
+#         # do not allow replacing the original token.
+#         # -----------------------------------------------------
+
+#         if (
+#             payment.zaincash_token_hash
+#             and payment.zaincash_token_hash != token_hash
+#         ):
+
+#             print(
+#                 "SECURITY ALERT: Different ZainCash token submitted",
+#                 {
+#                     "booking_id": booking.id,
+#                     "payment_id": payment.id,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Invalid payment token"
+#                 },
+#                 status=400
+#             )
+
+#         # =====================================================
+#         # 7. BASIC PAYMENT VALIDATION
+#         # =====================================================
+
+#         if not payment.transaction_id:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "ZainCash transaction ID is missing"
+#                 },
+#                 status=400
+#             )
+
+#         stored_external_reference = str(
+#             payment.external_reference or ""
+#         ).strip()
+
+#         if not stored_external_reference:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment reference missing"
+#                 },
+#                 status=400
+#             )
+
+#         # =====================================================
+#         # 8. TOKEN ↔ DATABASE VERIFICATION
+#         # =====================================================
+
+#         # -----------------------------------------------------
+#         # Order ID
+#         # -----------------------------------------------------
+
+#         if token_order_id != str(booking.id):
+
+#             print(
+#                 "SECURITY ALERT: Order ID mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "expected": str(booking.id),
+#                     "returned": token_order_id,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment order verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # -----------------------------------------------------
+#         # Transaction ID
+#         # -----------------------------------------------------
+
+#         stored_transaction_id = str(
+#             payment.transaction_id
+#         ).strip()
+
+#         if token_transaction_id != stored_transaction_id:
+
+#             print(
+#                 "SECURITY ALERT: Token transaction ID mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "expected": stored_transaction_id,
+#                     "returned": token_transaction_id,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment transaction verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # -----------------------------------------------------
+#         # External Reference
+#         # -----------------------------------------------------
+
+#         if not token_external_reference:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment reference missing from token"
+#                 },
+#                 status=400
+#             )
+
+#         if token_external_reference != stored_external_reference:
+
+#             print(
+#                 "SECURITY ALERT: External reference mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "stored": stored_external_reference,
+#                     "returned": token_external_reference,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment reference verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # -----------------------------------------------------
+#         # Amount
+#         # -----------------------------------------------------
+
+#         if token_amount is None:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment amount missing from token"
+#                 },
+#                 status=400
+#             )
+
+#         try:
+
+#             token_amount_decimal = Decimal(
+#                 str(token_amount)
+#             )
+
+#             expected_amount = Decimal(
+#                 str(payment.amount)
+#             )
+
+#         except Exception:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Invalid payment amount"
+#                 },
+#                 status=400
+#             )
+
+#         if token_amount_decimal != expected_amount:
+
+#             print(
+#                 "SECURITY ALERT: Token amount mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "expected": str(expected_amount),
+#                     "returned": str(token_amount_decimal),
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment amount verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # -----------------------------------------------------
+#         # Currency
+#         # -----------------------------------------------------
+
+#         expected_currency = str(
+#             payment.currency
+#         ).upper().strip()
+
+#         if token_currency != expected_currency:
+
+#             print(
+#                 "SECURITY ALERT: Token currency mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "expected": expected_currency,
+#                     "returned": token_currency,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment currency verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # =====================================================
+#         # 9. ASK ZAINCASH DIRECTLY
+#         # =====================================================
+
+#         try:
+
+#             zain_response = inquiry_payment(
+#                 payment.transaction_id
+#             )
+
+#         except Exception as e:
+
+#             print(
+#                 f"ZainCash inquiry failed for booking "
+#                 f"{booking.id}: {e}"
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Unable to verify payment with ZainCash"
+#                 },
+#                 status=502
+#             )
+
+#         print(
+#             "ZainCash final inquiry:",
+#             zain_response
+#         )
+
+#         # =====================================================
+#         # 10. EXTRACT ZAINCASH RESPONSE
+#         # =====================================================
+
+#         transaction_status = str(
+#             zain_response.get(
+#                 "status",
+#                 ""
+#             )
+#         ).upper().strip()
+
+#         transaction_details = zain_response.get(
+#             "transactionDetails",
+#             {}
+#         )
+
+#         if not transaction_status:
+
+#             transaction_status = str(
+#                 transaction_details.get(
+#                     "status",
+#                     ""
+#                 )
+#             ).upper().strip()
+
+#         # =====================================================
+#         # 11. ZAINCASH MUST CONFIRM SUCCESS
+#         # =====================================================
+
+#         if transaction_status != "SUCCESS":
+
+#             if transaction_status in [
+#                 "FAILED",
+#                 "EXPIRED",
+#                 "REFUNDED"
+#             ]:
+
+#                 payment.status = "failed"
+
+#                 payment.save(
+#                     update_fields=["status"]
+#                 )
+
+#                 booking.payment_status = "failed"
+
+#                 if booking.booking_status != "cancelled":
+#                     booking.booking_status = "pending"
+
+#                 booking.save(
+#                     update_fields=[
+#                         "payment_status",
+#                         "booking_status"
+#                     ]
+#                 )
+
+#                 return Response(
+#                     {
+#                         "success": False,
+#                         "payment_status": "failed",
+#                         "booking_status": booking.booking_status,
+#                         "message": "ZainCash payment was not successful"
+#                     }
+#                 )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "payment_status": "pending",
+#                     "booking_status": booking.booking_status,
+#                     "message": "ZainCash payment is still pending"
+#                 }
+#             )
+
+#         # =====================================================
+#         # 12. VERIFY ZAINCASH TRANSACTION ID
+#         # =====================================================
+
+#         returned_transaction_id = str(
+#             transaction_details.get(
+#                 "transactionId",
+#                 ""
+#             )
+#         ).strip()
+
+#         if not returned_transaction_id:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "ZainCash did not return transaction ID"
+#                 },
+#                 status=400
+#             )
+
+#         if returned_transaction_id != stored_transaction_id:
+
+#             print(
+#                 "SECURITY ALERT: Inquiry transaction ID mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "expected": stored_transaction_id,
+#                     "returned": returned_transaction_id,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Transaction verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # =====================================================
+#         # 13. VERIFY EXTERNAL REFERENCE
+#         # =====================================================
+
+#         returned_external_reference = str(
+#             transaction_details.get(
+#                 "externalReferenceId",
+#                 ""
+#             )
+#         ).strip()
+
+#         if not returned_external_reference:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "ZainCash did not return external reference"
+#                 },
+#                 status=400
+#             )
+
+#         if returned_external_reference != stored_external_reference:
+
+#             print(
+#                 "SECURITY ALERT: Inquiry external reference mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "expected": stored_external_reference,
+#                     "returned": returned_external_reference,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment reference verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # =====================================================
+#         # 14. VERIFY ORDER ID
+#         # =====================================================
+
+#         returned_order_id = str(
+#             transaction_details.get(
+#                 "orderId",
+#                 ""
+#             )
+#         ).strip()
+
+#         expected_order_id = str(
+#             booking.id
+#         ).strip()
+
+#         if not returned_order_id:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "ZainCash did not return order ID"
+#                 },
+#                 status=400
+#             )
+
+#         if returned_order_id != expected_order_id:
+
+#             print(
+#                 "SECURITY ALERT: Inquiry order ID mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "expected": expected_order_id,
+#                     "returned": returned_order_id,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Order verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # =====================================================
+#         # 15. VERIFY AMOUNT
+#         # =====================================================
+
+#         zain_amount_data = transaction_details.get(
+#             "amount",
+#             {}
+#         )
+
+#         zain_amount_value = zain_amount_data.get(
+#             "value"
+#         )
+
+#         if zain_amount_value is None:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "ZainCash did not return payment amount"
+#                 },
+#                 status=400
+#             )
+
+#         try:
+
+#             zain_amount = Decimal(
+#                 str(zain_amount_value)
+#             )
+
+#         except Exception:
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Invalid payment amount returned by ZainCash"
+#                 },
+#                 status=400
+#             )
+
+#         if zain_amount != expected_amount:
+
+#             print(
+#                 "SECURITY ALERT: Inquiry amount mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "expected": str(expected_amount),
+#                     "returned": str(zain_amount),
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment amount verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # =====================================================
+#         # 16. VERIFY CURRENCY
+#         # =====================================================
+
+#         zain_currency = str(
+#             zain_amount_data.get(
+#                 "currency",
+#                 ""
+#             )
+#         ).upper().strip()
+
+#         if zain_currency != expected_currency:
+
+#             print(
+#                 "SECURITY ALERT: Inquiry currency mismatch",
+#                 {
+#                     "booking_id": booking.id,
+#                     "expected": expected_currency,
+#                     "returned": zain_currency,
+#                 }
+#             )
+
+#             return Response(
+#                 {
+#                     "success": False,
+#                     "error": "Payment currency verification failed"
+#                 },
+#                 status=400
+#             )
+
+#         # =====================================================
+#         # 17. EVERYTHING MATCHED
+#         #
+#         # NOW AND ONLY NOW consume the token.
+#         # =====================================================
+
+#         payment.status = "paid"
+#         payment.paid_at = timezone.now()
+
+#         payment.transaction_id = stored_transaction_id
+
+#         # Save SHA-256 hash of the callback token.
+#         # Never store the raw token.
+#         payment.zaincash_token_hash = token_hash
+#         payment.zaincash_token_used = True
+#         payment.zaincash_token_used_at = timezone.now()
+
+#         payment.save(
+#             update_fields=[
+#                 "status",
+#                 "paid_at",
+#                 "transaction_id",
+#                 "zaincash_token_hash",
+#                 "zaincash_token_used",
+#                 "zaincash_token_used_at",
+#             ]
+#         )
+
+#         # =====================================================
+#         # 18. CONFIRM BOOKING
+#         # =====================================================
+
+#         booking.payment_status = "paid"
+#         booking.payment_method = "online"
+#         booking.booking_status = "confirmed"
+#         booking.confirmed_by = "ZainCash"
+
+#         booking.save(
+#             update_fields=[
+#                 "payment_status",
+#                 "payment_method",
+#                 "booking_status",
+#                 "confirmed_by",
+#             ]
+#         )
+
+#         # =====================================================
+#         # 19. SEND CONFIRMATION EMAIL
+#         # =====================================================
+
+#         try:
+
+#             send_booking_confirmation_email(
+#                 booking
+#             )
+
+#         except Exception as e:
+
+#             print(
+#                 f"Confirmation email failed for booking "
+#                 f"{booking.id}: {e}"
+#             )
+
+#         # =====================================================
+#         # 20. SEND RECEPTION NOTIFICATION
+#         # =====================================================
+
+#         try:
+
+#             send_reception_booking_notification(
+#                 booking
+#             )
+
+#         except Exception as e:
+
+#             print(
+#                 f"Reception notification email failed "
+#                 f"for booking {booking.id}: {e}"
+#             )
+
+#         # =====================================================
+#         # 21. CLOSE ROOM AUTOMATICALLY
+#         # =====================================================
+
+#         setting = AutoCloseSetting.objects.first()
+
+#         if (
+#             setting
+#             and setting.auto_close_booked_room
+#             and booking.room
+#         ):
+
+#             booking.room.status = "OFF"
+#             booking.room.is_available = False
+
+#             booking.room.save()
+
+#         # =====================================================
+#         # 22. FINAL RESPONSE
+#         # =====================================================
+
+#         return Response(
+#             {
+#                 "success": True,
+#                 "payment_status": "paid",
+#                 "booking_status": "confirmed",
+#                 "booking": BookingSerializer(
+#                     booking
+#                 ).data,
+#                 "transaction": zain_response,
+#             }
+#         )
+
+
+
+
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@throttle_classes([AnonRateThrottle])
 def zaincash_verify_payment(request, booking_id):
     """
     Securely verify a ZainCash payment.
 
-    The booking is confirmed ONLY if the ZainCash inquiry confirms:
-    - transaction status = SUCCESS
-    - transaction ID matches our Payment
-    - external reference matches our Payment
-    - order ID matches our booking ID
-    - amount matches our Payment amount
-    - currency matches our Payment currency
+    IMPORTANT:
+    The callback JWT is NOT trusted for payment confirmation.
+    We only decode it to obtain reference information.
+
+    Final payment confirmation is done ONLY through
+    ZainCash Inquiry API.
+
+    Checks:
+    - Token exists
+    - Token can be decoded
+    - Token status = SUCCESS
+    - Token orderId matches booking
+    - Token transactionId matches Payment
+    - Token externalReferenceId matches Payment
+    - Token amount matches Payment
+    - Token currency matches Payment
+    - ZainCash Inquiry status = SUCCESS
+    - Inquiry transactionId matches Payment
+    - Inquiry externalReferenceId matches Payment
+    - Inquiry orderId matches booking
+    - Inquiry amount matches Payment
+    - Inquiry currency matches Payment
+    - Replay protection
+    - select_for_update() prevents concurrent processing
     """
+
+    import hashlib
+    from decimal import Decimal
+    import jwt
+
+    # =========================================================
+    # 1. GET CALLBACK TOKEN
+    # =========================================================
 
     token = request.query_params.get("token")
 
@@ -3293,51 +5031,56 @@ def zaincash_verify_payment(request, booking_id):
             status=400
         )
 
-    # =====================================================
-    # VERIFY ZAINCASH JWT
-    # =====================================================
+    # =========================================================
+    # 2. DECODE TOKEN WITHOUT TRUSTING ITS SIGNATURE
+    #
+    # IMPORTANT:
+    # We do NOT use this token as proof of payment.
+    # ZainCash Inquiry API will be the final authority.
+    # =========================================================
 
     try:
-
-        token_payload = verify_zaincash_callback_token(
-            token
+        token_payload = jwt.decode(
+            token,
+            options={
+                "verify_signature": False,
+                "verify_exp": False,
+                "verify_nbf": False,
+            }
         )
 
-    except ValueError as e:
-
+    except Exception as e:
         print(
-            "SECURITY ALERT: Invalid ZainCash callback token"
+            "SECURITY ALERT: Invalid ZainCash callback token format:",
+            str(e)
         )
 
         return Response(
             {
                 "success": False,
-                "error": "Invalid or expired payment token"
+                "error": "Invalid payment token"
             },
             status=401
         )
 
-    # =====================================================
-    # 1. Get booking
-    # =====================================================
+    # =========================================================
+    # 3. CREATE SHA-256 TOKEN HASH
+    #
+    # Never store the real token.
+    # =========================================================
 
-    try:
-        booking = Booking.objects.get(id=booking_id)
+    token_hash = hashlib.sha256(
+        token.encode("utf-8")
+    ).hexdigest()
 
-    except Booking.DoesNotExist:
-        return Response(
-            {
-                "success": False,
-                "error": "Booking not found"
-            },
-            status=404
-        )
+    # =========================================================
+    # 4. EXTRACT TOKEN DATA
+    # =========================================================
 
-        # =====================================================
-    # VERIFY TOKEN DATA AGAINST BOOKING
-    # =====================================================
-
-    token_data = token_payload.get("data", token_payload)
+    token_data = token_payload.get(
+        "data",
+        token_payload
+    )
 
     token_transaction_id = str(
         token_data.get(
@@ -3371,12 +5114,15 @@ def zaincash_verify_payment(request, booking_id):
                 ""
             )
         )
-    ).upper()
+    ).upper().strip()
 
     token_amount_data = token_data.get(
         "amount",
         {}
     )
+
+    if not isinstance(token_amount_data, dict):
+        token_amount_data = {}
 
     token_amount = token_amount_data.get(
         "value"
@@ -3387,108 +5133,334 @@ def zaincash_verify_payment(request, booking_id):
             "currency",
             ""
         )
-    ).upper()
+    ).upper().strip()
 
+    # =========================================================
+    # 5. TOKEN MUST INDICATE SUCCESS
+    # =========================================================
 
-
-    # =====================================================
-    # 2. Get ZainCash payment for this booking
-    # =====================================================
-
-    payment = (
-        Payment.objects
-        .filter(
-            booking=booking,
-            gateway="zaincash"
-        )
-        .order_by("-created_at")
-        .first()
-    )
-
-    if not payment:
-        return Response(
-            {
-                "success": False,
-                "error": "ZainCash payment not found"
-            },
-            status=404
-        )
-
-
-
-
-        # =====================================================
-    # TOKEN ↔ DATABASE VERIFICATION
-    # =====================================================
-
-    if token_order_id != str(booking.id):
-
-        return Response(
-            {
-                "success": False,
-                "error": "Payment order verification failed"
-            },
-            status=400
-        )
-
-    if token_transaction_id != str(
-        payment.transaction_id
-    ).strip():
-
-        return Response(
-            {
-                "success": False,
-                "error": "Payment transaction verification failed"
-            },
-            status=400
-        )
-
-    stored_external_reference = str(
-        payment.external_reference or ""
-    ).strip()
-
-    if not token_external_reference:
-        return Response(
-            {
-                "success": False,
-                "error": "Payment reference missing from token"
-            },
-            status=400
-        )
-
-    if (
-        not stored_external_reference
-        or token_external_reference != stored_external_reference
-    ):
+    if token_status != "SUCCESS":
         print(
-            "SECURITY ALERT: External reference mismatch",
+            "SECURITY ALERT: Invalid ZainCash token status",
             {
-                "booking_id": booking.id,
-                "stored": stored_external_reference,
-                "returned": token_external_reference,
+                "booking_id": booking_id,
+                "token_status": token_status,
             }
         )
 
         return Response(
             {
                 "success": False,
-                "error": "Payment reference verification failed"
+                "error": "Payment token is not successful"
             },
             status=400
         )
 
-        
+    # =========================================================
+    # 6. ATOMIC DATABASE TRANSACTION
+    #
+    # Lock booking + payment.
+    # This prevents two simultaneous requests from
+    # confirming the same payment.
+    # =========================================================
 
-    
+    with transaction.atomic():
 
-    try:
+        # -----------------------------------------------------
+        # Lock booking
+        # -----------------------------------------------------
+
+        try:
+            booking = (
+                Booking.objects
+                .select_for_update()
+                .get(id=booking_id)
+            )
+
+        except Booking.DoesNotExist:
+            return Response(
+                {
+                    "success": False,
+                    "error": "Booking not found"
+                },
+                status=404
+            )
+
+        # -----------------------------------------------------
+        # If booking is already paid
+        # -----------------------------------------------------
+
+        if booking.payment_status == "paid":
+            print(
+                "SECURITY ALERT: Replay attempt on already paid booking",
+                {
+                    "booking_id": booking.id,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment has already been confirmed"
+                },
+                status=409
+            )
+
+        # -----------------------------------------------------
+        # Lock ZainCash payment
+        # -----------------------------------------------------
+
+        payment = (
+            Payment.objects
+            .select_for_update()
+            .filter(
+                booking=booking,
+                gateway="zaincash"
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not payment:
+            return Response(
+                {
+                    "success": False,
+                    "error": "ZainCash payment not found"
+                },
+                status=404
+            )
+
+        # =====================================================
+        # 7. REPLAY PROTECTION
+        # =====================================================
+
+        if payment.zaincash_token_used:
+            print(
+                "SECURITY ALERT: ZainCash token replay detected",
+                {
+                    "booking_id": booking.id,
+                    "payment_id": payment.id,
+                    "transaction_id": payment.transaction_id,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment token has already been used"
+                },
+                status=409
+            )
+
+        # -----------------------------------------------------
+        # Check whether this token was used by another payment
+        # -----------------------------------------------------
+
+        existing_token_payment = (
+            Payment.objects
+            .filter(
+                zaincash_token_hash=token_hash,
+                zaincash_token_used=True
+            )
+            .exclude(id=payment.id)
+            .first()
+        )
+
+        if existing_token_payment:
+            print(
+                "SECURITY ALERT: ZainCash token reused",
+                {
+                    "booking_id": booking.id,
+                    "payment_id": payment.id,
+                    "previous_payment_id": (
+                        existing_token_payment.id
+                    ),
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment token has already been used"
+                },
+                status=409
+            )
+
+        # -----------------------------------------------------
+        # If payment already has a different token
+        # don't allow token replacement
+        # -----------------------------------------------------
+
+        if (
+            payment.zaincash_token_hash
+            and payment.zaincash_token_hash != token_hash
+        ):
+            print(
+                "SECURITY ALERT: Different ZainCash token submitted",
+                {
+                    "booking_id": booking.id,
+                    "payment_id": payment.id,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Invalid payment token"
+                },
+                status=400
+            )
+
+        # =====================================================
+        # 8. BASIC PAYMENT VALIDATION
+        # =====================================================
+
+        if not payment.transaction_id:
+            return Response(
+                {
+                    "success": False,
+                    "error": "ZainCash transaction ID is missing"
+                },
+                status=400
+            )
+
+        stored_transaction_id = str(
+            payment.transaction_id
+        ).strip()
+
+        stored_external_reference = str(
+            payment.external_reference or ""
+        ).strip()
+
+        if not stored_external_reference:
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment reference missing"
+                },
+                status=400
+            )
+
+        # =====================================================
+        # 9. TOKEN ↔ DATABASE VALIDATION
+        # =====================================================
+
+        # -----------------------------------------------------
+        # Order ID
+        # -----------------------------------------------------
+
+        if token_order_id != str(booking.id):
+            print(
+                "SECURITY ALERT: Token order ID mismatch",
+                {
+                    "booking_id": booking.id,
+                    "expected": str(booking.id),
+                    "returned": token_order_id,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment order verification failed"
+                },
+                status=400
+            )
+
+        # -----------------------------------------------------
+        # Transaction ID
+        # -----------------------------------------------------
+
+        if token_transaction_id != stored_transaction_id:
+            print(
+                "SECURITY ALERT: Token transaction ID mismatch",
+                {
+                    "booking_id": booking.id,
+                    "expected": stored_transaction_id,
+                    "returned": token_transaction_id,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment transaction verification failed"
+                },
+                status=400
+            )
+
+        # -----------------------------------------------------
+        # External Reference
+        # -----------------------------------------------------
+
+        if not token_external_reference:
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment reference missing from token"
+                },
+                status=400
+            )
+
+        if token_external_reference != stored_external_reference:
+            print(
+                "SECURITY ALERT: Token external reference mismatch",
+                {
+                    "booking_id": booking.id,
+                    "stored": stored_external_reference,
+                    "returned": token_external_reference,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment reference verification failed"
+                },
+                status=400
+            )
+
+        # -----------------------------------------------------
+        # Amount
+        # -----------------------------------------------------
 
         if token_amount is None:
-            raise ValueError()
+            return Response(
+                {
+                    "success": False,
+                    "error": "Payment amount missing from token"
+                },
+                status=400
+            )
 
-        if Decimal(str(token_amount)) != Decimal(
-            str(payment.amount)
-        ):
+        try:
+            token_amount_decimal = Decimal(
+                str(token_amount)
+            )
+
+            expected_amount = Decimal(
+                str(payment.amount)
+            )
+
+        except Exception:
+            return Response(
+                {
+                    "success": False,
+                    "error": "Invalid payment amount"
+                },
+                status=400
+            )
+
+        if token_amount_decimal != expected_amount:
+            print(
+                "SECURITY ALERT: Token amount mismatch",
+                {
+                    "booking_id": booking.id,
+                    "expected": str(expected_amount),
+                    "returned": str(token_amount_decimal),
+                }
+            )
+
             return Response(
                 {
                     "success": False,
@@ -3497,480 +5469,466 @@ def zaincash_verify_payment(request, booking_id):
                 status=400
             )
 
-    except Exception:
+        # -----------------------------------------------------
+        # Currency
+        # -----------------------------------------------------
 
-        return Response(
-            {
-                "success": False,
-                "error": "Invalid payment amount"
-            },
-            status=400
-        )
+        expected_currency = str(
+            payment.currency
+        ).upper().strip()
 
-
-    if token_currency != str(
-        payment.currency
-    ).upper():
-
-        return Response(
-            {
-                "success": False,
-                "error": "Payment currency verification failed"
-            },
-            status=400
-        )
-
-
-
-
-
-    # =====================================================
-    # 3. Make sure we have our original transaction ID
-    # =====================================================
-
-    if not payment.transaction_id:
-        return Response(
-            {
-                "success": False,
-                "error": "ZainCash transaction ID is missing"
-            },
-            status=400
-        )
-
-    # =====================================================
-    # 4. If already successfully paid
-    # =====================================================
-
-    if (
-        payment.status == "paid"
-        and booking.payment_status == "paid"
-        and booking.booking_status == "confirmed"
-    ):
-        return Response(
-            {
-                "success": True,
-                "payment_status": "paid",
-                "booking_status": "confirmed",
-                "booking": BookingSerializer(booking).data,
-            }
-        )
-
-    # =====================================================
-    # 5. Ask ZainCash directly
-    # =====================================================
-
-    try:
-
-        zain_response = inquiry_payment(
-            payment.transaction_id
-        )
-
-    except Exception as e:
-
-        print(
-            f"ZainCash inquiry failed for booking "
-            f"{booking.id}: {e}"
-        )
-
-        return Response(
-            {
-                "success": False,
-                "error": "Unable to verify payment with ZainCash",
-            },
-            status=502
-        )
-
-    print("ZainCash final inquiry:", zain_response)
-
-    # =====================================================
-    # 6. Extract ZainCash response
-    # =====================================================
-
-    transaction_status = str(
-        zain_response.get("status", "")
-    ).upper()
-
-    transaction_details = zain_response.get(
-        "transactionDetails",
-        {}
-    )
-
-    # Some responses may contain status inside transactionDetails
-    if not transaction_status:
-
-        transaction_status = str(
-            transaction_details.get("status", "")
-        ).upper()
-
-    # =====================================================
-    # 7. If transaction is not SUCCESS
-    # =====================================================
-
-    if transaction_status != "SUCCESS":
-
-        if transaction_status in [
-            "FAILED",
-            "EXPIRED",
-            "REFUNDED"
-        ]:
-
-            payment.status = "failed"
-            payment.save(
-                update_fields=["status"]
-            )
-
-            booking.payment_status = "failed"
-
-            if booking.booking_status != "cancelled":
-                booking.booking_status = "pending"
-
-            booking.save(
-                update_fields=[
-                    "payment_status",
-                    "booking_status"
-                ]
+        if token_currency != expected_currency:
+            print(
+                "SECURITY ALERT: Token currency mismatch",
+                {
+                    "booking_id": booking.id,
+                    "expected": expected_currency,
+                    "returned": token_currency,
+                }
             )
 
             return Response(
                 {
                     "success": False,
-                    "payment_status": "failed",
+                    "error": "Payment currency verification failed"
+                },
+                status=400
+            )
+
+        # =====================================================
+        # 10. ASK ZAINCASH DIRECTLY
+        #
+        # THIS IS THE FINAL PAYMENT VERIFICATION.
+        # =====================================================
+
+        try:
+            zain_response = inquiry_payment(
+                stored_transaction_id
+            )
+
+        except Exception as e:
+            print(
+                f"ZainCash inquiry failed for booking "
+                f"{booking.id}: {e}"
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Unable to verify payment with ZainCash"
+                },
+                status=502
+            )
+
+        print(
+            "ZainCash inquiry status:",
+            zain_response.get("status")
+        )
+
+        # =====================================================
+        # 11. EXTRACT INQUIRY RESPONSE
+        # =====================================================
+
+        transaction_status = str(
+            zain_response.get(
+                "status",
+                ""
+            )
+        ).upper().strip()
+
+        transaction_details = zain_response.get(
+            "transactionDetails",
+            {}
+        )
+
+        if not isinstance(transaction_details, dict):
+            transaction_details = {}
+
+        if not transaction_status:
+            transaction_status = str(
+                transaction_details.get(
+                    "status",
+                    ""
+                )
+            ).upper().strip()
+
+        # =====================================================
+        # 12. ZAINCASH MUST CONFIRM SUCCESS
+        # =====================================================
+
+        if transaction_status != "SUCCESS":
+
+            if transaction_status in [
+                "FAILED",
+                "EXPIRED",
+                "REFUNDED"
+            ]:
+
+                payment.status = "failed"
+
+                payment.save(
+                    update_fields=["status"]
+                )
+
+                booking.payment_status = "failed"
+
+                if booking.booking_status != "cancelled":
+                    booking.booking_status = "pending"
+
+                booking.save(
+                    update_fields=[
+                        "payment_status",
+                        "booking_status"
+                    ]
+                )
+
+                return Response(
+                    {
+                        "success": False,
+                        "payment_status": "failed",
+                        "booking_status": booking.booking_status,
+                        "message": (
+                            "ZainCash payment was not successful"
+                        )
+                    }
+                )
+
+            return Response(
+                {
+                    "success": False,
+                    "payment_status": "pending",
                     "booking_status": booking.booking_status,
-                    "message": "ZainCash payment was not successful"
+                    "message": (
+                        "ZainCash payment is still pending"
+                    )
                 }
             )
 
-        # Still pending / unknown status
+        # =====================================================
+        # 13. VERIFY INQUIRY TRANSACTION ID
+        # =====================================================
 
-        return Response(
-            {
-                "success": False,
-                "payment_status": "pending",
-                "booking_status": booking.booking_status,
-                "message": "ZainCash payment is still pending"
-            }
+        returned_transaction_id = str(
+            transaction_details.get(
+                "transactionId",
+                ""
+            )
+        ).strip()
+
+        if not returned_transaction_id:
+            return Response(
+                {
+                    "success": False,
+                    "error": (
+                        "ZainCash did not return transaction ID"
+                    )
+                },
+                status=400
+            )
+
+        if returned_transaction_id != stored_transaction_id:
+            print(
+                "SECURITY ALERT: Inquiry transaction ID mismatch",
+                {
+                    "booking_id": booking.id,
+                    "expected": stored_transaction_id,
+                    "returned": returned_transaction_id,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Transaction verification failed"
+                },
+                status=400
+            )
+
+        # =====================================================
+        # 14. VERIFY INQUIRY EXTERNAL REFERENCE
+        # =====================================================
+
+        returned_external_reference = str(
+            transaction_details.get(
+                "externalReferenceId",
+                ""
+            )
+        ).strip()
+
+        if not returned_external_reference:
+            return Response(
+                {
+                    "success": False,
+                    "error": (
+                        "ZainCash did not return external reference"
+                    )
+                },
+                status=400
+            )
+
+        if returned_external_reference != stored_external_reference:
+            print(
+                "SECURITY ALERT: Inquiry external reference mismatch",
+                {
+                    "booking_id": booking.id,
+                    "expected": stored_external_reference,
+                    "returned": returned_external_reference,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": (
+                        "Payment reference verification failed"
+                    )
+                },
+                status=400
+            )
+
+        # =====================================================
+        # 15. VERIFY INQUIRY ORDER ID
+        # =====================================================
+
+        returned_order_id = str(
+            transaction_details.get(
+                "orderId",
+                ""
+            )
+        ).strip()
+
+        expected_order_id = str(
+            booking.id
+        ).strip()
+
+        if not returned_order_id:
+            return Response(
+                {
+                    "success": False,
+                    "error": "ZainCash did not return order ID"
+                },
+                status=400
+            )
+
+        if returned_order_id != expected_order_id:
+            print(
+                "SECURITY ALERT: Inquiry order ID mismatch",
+                {
+                    "booking_id": booking.id,
+                    "expected": expected_order_id,
+                    "returned": returned_order_id,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": "Order verification failed"
+                },
+                status=400
+            )
+
+        # =====================================================
+        # 16. VERIFY INQUIRY AMOUNT
+        # =====================================================
+
+        zain_amount_data = transaction_details.get(
+            "amount",
+            {}
         )
 
-    # =====================================================
-    # 8. SUCCESS
-    # Now verify EVERYTHING
-    # =====================================================
+        if not isinstance(zain_amount_data, dict):
+            zain_amount_data = {}
 
-    # -----------------------------------------------------
-    # 8.1 Transaction ID
-    # -----------------------------------------------------
-
-    returned_transaction_id = str(
-        transaction_details.get(
-            "transactionId",
-            ""
-        )
-    ).strip()
-
-    stored_transaction_id = str(
-        payment.transaction_id
-    ).strip()
-
-    if not returned_transaction_id:
-        return Response(
-            {
-                "success": False,
-                "error": "ZainCash did not return transaction ID"
-            },
-            status=400
+        zain_amount_value = zain_amount_data.get(
+            "value"
         )
 
-    if returned_transaction_id != stored_transaction_id:
+        if zain_amount_value is None:
+            return Response(
+                {
+                    "success": False,
+                    "error": (
+                        "ZainCash did not return payment amount"
+                    )
+                },
+                status=400
+            )
 
-        print(
-            "SECURITY ALERT: Transaction ID mismatch",
-            {
-                "booking_id": booking.id,
-                "stored": stored_transaction_id,
-                "returned": returned_transaction_id,
-            }
+        try:
+            zain_amount = Decimal(
+                str(zain_amount_value)
+            )
+
+        except Exception:
+            return Response(
+                {
+                    "success": False,
+                    "error": (
+                        "Invalid payment amount returned by ZainCash"
+                    )
+                },
+                status=400
+            )
+
+        if zain_amount != expected_amount:
+            print(
+                "SECURITY ALERT: Inquiry amount mismatch",
+                {
+                    "booking_id": booking.id,
+                    "expected": str(expected_amount),
+                    "returned": str(zain_amount),
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": (
+                        "Payment amount verification failed"
+                    )
+                },
+                status=400
+            )
+
+        # =====================================================
+        # 17. VERIFY INQUIRY CURRENCY
+        # =====================================================
+
+        zain_currency = str(
+            zain_amount_data.get(
+                "currency",
+                ""
+            )
+        ).upper().strip()
+
+        if zain_currency != expected_currency:
+            print(
+                "SECURITY ALERT: Inquiry currency mismatch",
+                {
+                    "booking_id": booking.id,
+                    "expected": expected_currency,
+                    "returned": zain_currency,
+                }
+            )
+
+            return Response(
+                {
+                    "success": False,
+                    "error": (
+                        "Payment currency verification failed"
+                    )
+                },
+                status=400
+            )
+
+        # =====================================================
+        # 18. EVERYTHING MATCHED
+        #
+        # NOW AND ONLY NOW:
+        # - mark token as used
+        # - mark payment as paid
+        # - confirm booking
+        # =====================================================
+
+        payment.status = "paid"
+        payment.paid_at = timezone.now()
+        payment.transaction_id = stored_transaction_id
+
+        # Never store the real JWT token
+        payment.zaincash_token_hash = token_hash
+        payment.zaincash_token_used = True
+        payment.zaincash_token_used_at = timezone.now()
+
+        payment.save(
+            update_fields=[
+                "status",
+                "paid_at",
+                "transaction_id",
+                "zaincash_token_hash",
+                "zaincash_token_used",
+                "zaincash_token_used_at",
+            ]
         )
 
-        return Response(
-            {
-                "success": False,
-                "error": "Transaction verification failed"
-            },
-            status=400
+        # =====================================================
+        # 19. CONFIRM BOOKING
+        # =====================================================
+
+        booking.payment_status = "paid"
+        booking.payment_method = "online"
+        booking.booking_status = "confirmed"
+        booking.confirmed_by = "ZainCash"
+
+        booking.save(
+            update_fields=[
+                "payment_status",
+                "payment_method",
+                "booking_status",
+                "confirmed_by",
+            ]
         )
 
-    # -----------------------------------------------------
-    # 8.2 External Reference
-    # -----------------------------------------------------
+        # =====================================================
+        # 20. SEND CONFIRMATION EMAIL
+        # =====================================================
 
-    returned_external_reference = str(
-        transaction_details.get(
-            "externalReferenceId",
-            ""
-        )
-    ).strip()
-
-    stored_external_reference = str(
-        payment.external_reference or ""
-    ).strip()
-
-    if not returned_external_reference:
-        return Response(
-            {
-                "success": False,
-                "error": "ZainCash did not return external reference"
-            },
-            status=400
-        )
-
-    if (
-        not stored_external_reference
-        or
-        returned_external_reference != stored_external_reference
-    ):
-
-        print(
-            "SECURITY ALERT: External reference mismatch",
-            {
-                "booking_id": booking.id,
-                "stored": stored_external_reference,
-                "returned": returned_external_reference,
-            }
-        )
-
-        return Response(
-            {
-                "success": False,
-                "error": "Payment reference verification failed"
-            },
-            status=400
-        )
-
-    # -----------------------------------------------------
-    # 8.3 Order ID
-    # -----------------------------------------------------
-
-    returned_order_id = str(
-        transaction_details.get(
-            "orderId",
-            ""
-        )
-    ).strip()
-
-    expected_order_id = str(
-        booking.id
-    ).strip()
-
-    if not returned_order_id:
-        return Response(
-            {
-                "success": False,
-                "error": "ZainCash did not return order ID"
-            },
-            status=400
-        )
-
-    if returned_order_id != expected_order_id:
-
-        print(
-            "SECURITY ALERT: Order ID mismatch",
-            {
-                "booking_id": booking.id,
-                "expected": expected_order_id,
-                "returned": returned_order_id,
-            }
-        )
-
-        return Response(
-            {
-                "success": False,
-                "error": "Order verification failed"
-            },
-            status=400
-        )
-
-    # -----------------------------------------------------
-    # 8.4 Amount
-    # -----------------------------------------------------
-
-    zain_amount_data = transaction_details.get(
-        "amount",
-        {}
-    )
-
-    zain_amount_value = zain_amount_data.get(
-        "value"
-    )
-
-    if zain_amount_value is None:
-        return Response(
-            {
-                "success": False,
-                "error": "ZainCash did not return payment amount"
-            },
-            status=400
-        )
-
-    try:
-
-        zain_amount = Decimal(
-            str(zain_amount_value)
-        )
-
-        expected_amount = Decimal(
-            str(payment.amount)
-        )
-
-    except Exception:
-
-        return Response(
-            {
-                "success": False,
-                "error": "Invalid payment amount returned by ZainCash"
-            },
-            status=400
-        )
-
-    if zain_amount != expected_amount:
-
-        print(
-            "SECURITY ALERT: Amount mismatch",
-            {
-                "booking_id": booking.id,
-                "expected": str(expected_amount),
-                "returned": str(zain_amount),
-            }
-        )
-
-        return Response(
-            {
-                "success": False,
-                "error": "Payment amount verification failed"
-            },
-            status=400
-        )
-
-    # -----------------------------------------------------
-    # 8.5 Currency
-    # -----------------------------------------------------
-
-    zain_currency = str(
-        zain_amount_data.get(
-            "currency",
-            ""
-        )
-    ).upper().strip()
-
-    expected_currency = str(
-        payment.currency
-    ).upper().strip()
-
-    if zain_currency != expected_currency:
-
-        print(
-            "SECURITY ALERT: Currency mismatch",
-            {
-                "booking_id": booking.id,
-                "expected": expected_currency,
-                "returned": zain_currency,
-            }
-        )
-
-        return Response(
-            {
-                "success": False,
-                "error": "Payment currency verification failed"
-            },
-            status=400
-        )
-
-    # =====================================================
-    # 9. EVERYTHING MATCHED
-    # Now and ONLY now confirm payment
-    # =====================================================
-
-    payment.status = "paid"
-    payment.paid_at = timezone.now()
-
-    # Keep original transaction ID
-    payment.transaction_id = stored_transaction_id
-
-    payment.save()
-
-    # -----------------------------------------------------
-    # Confirm booking
-    # -----------------------------------------------------
-
-    booking.payment_status = "paid"
-    booking.payment_method = "online"
-    booking.booking_status = "confirmed"
-    booking.confirmed_by = "ZainCash"
-
-    booking.save()
-
-    # =====================================================
-    # 10. Send confirmation email
-    # =====================================================
-
-    try:
-
-        send_booking_confirmation_email(
-            booking
-        )
-
-    except Exception as e:
-
-        print(
-            f"Confirmation email failed for booking "
-            f"{booking.id}: {e}"
-        )
-
-    # =====================================================
-    # 11. Send reception notification
-    # =====================================================
-
-    try:
-
-        send_reception_booking_notification(
-            booking
-        )
-
-    except Exception as e:
-
-        print(
-            f"Reception notification email failed "
-            f"for booking {booking.id}: {e}"
-        )
-
-    # =====================================================
-    # 12. Close room automatically
-    # =====================================================
-
-    setting = AutoCloseSetting.objects.first()
-
-    if (
-        setting
-        and setting.auto_close_booked_room
-        and booking.room
-    ):
-
-        booking.room.status = "OFF"
-        booking.room.is_available = False
-
-        booking.room.save()
-
-    # =====================================================
-    # 13. Final response
-    # =====================================================
-
-    return Response(
-        {
-            "success": True,
-            "payment_status": "paid",
-            "booking_status": "confirmed",
-            "booking": BookingSerializer(
+        try:
+            send_booking_confirmation_email(
                 booking
-            ).data,
-            "transaction": zain_response,
-        }
-    )
+            )
+
+        except Exception as e:
+            print(
+                f"Confirmation email failed for booking "
+                f"{booking.id}: {e}"
+            )
+
+        # =====================================================
+        # 21. SEND RECEPTION NOTIFICATION
+        # =====================================================
+
+        try:
+            send_reception_booking_notification(
+                booking
+            )
+
+        except Exception as e:
+            print(
+                f"Reception notification email failed "
+                f"for booking {booking.id}: {e}"
+            )
+
+        # =====================================================
+        # 22. CLOSE ROOM AUTOMATICALLY
+        # =====================================================
+
+        setting = AutoCloseSetting.objects.first()
+
+        if (
+            setting
+            and setting.auto_close_booked_room
+            and booking.room
+        ):
+            booking.room.status = "OFF"
+            booking.room.is_available = False
+
+            booking.room.save()
+
+        # =====================================================
+        # 23. FINAL RESPONSE
+        # =====================================================
+
+        return Response(
+            {
+                "success": True,
+                "payment_status": "paid",
+                "booking_status": "confirmed",
+                "booking": BookingSerializer(
+                    booking
+                ).data,
+                "transaction": {
+                    "status": transaction_status
+                }
+            }
+        )
