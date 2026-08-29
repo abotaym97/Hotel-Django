@@ -634,7 +634,9 @@ def profile(request):
             "is_staff": request.user.is_staff,
         })
 
+    # ==============================
     # UPDATE PROFILE
+    # ==============================
 
     first_name = request.data.get(
         "first_name",
@@ -666,28 +668,72 @@ def profile(request):
         profile.address
     )
 
-    # Check email uniqueness
-    if (
-        email != request.user.email
-        and User.objects.filter(email=email).exclude(
+
+    # ==============================
+    # NORMALIZE EMAIL
+    # ==============================
+
+    email = email.strip().lower()
+    current_email = request.user.email.strip().lower()
+
+
+    # ==============================
+    # CHECK EMAIL UNIQUENESS
+    # ==============================
+
+    if email != current_email:
+
+        if User.objects.filter(
+            email=email
+        ).exclude(
             id=request.user.id
-        ).exists()
-    ):
-        return Response(
-            {
-                "email": "This email is already in use."
-            },
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        ).exists():
+
+            return Response(
+                {
+                    "email": "This email is already in use."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Also check username
+        if User.objects.filter(
+            username=email
+        ).exclude(
+            id=request.user.id
+        ).exists():
+
+            return Response(
+                {
+                    "email": "This email is already in use."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+    # ==============================
+    # UPDATE USER
+    # ==============================
 
     request.user.first_name = first_name
     request.user.last_name = last_name
-    request.user.email = email
 
-    # Your system uses email as username
-    request.user.username = email
+
+    # Only change email/username
+    # when the email was actually changed
+
+    if email != current_email:
+
+        request.user.email = email
+        request.user.username = email
+
 
     request.user.save()
+
+
+    # ==============================
+    # UPDATE PROFILE
+    # ==============================
 
     profile.phone = phone
     profile.country = country
@@ -695,16 +741,22 @@ def profile(request):
 
     profile.save()
 
-    return Response({
-        "message": "Profile updated successfully.",
-        "first_name": request.user.first_name,
-        "last_name": request.user.last_name,
-        "email": request.user.email,
-        "phone": profile.phone,
-        "country": profile.country,
-        "address": profile.address,
-    })
 
+    # ==============================
+    # RESPONSE
+    # ==============================
+
+    return Response(
+        {
+            "message": "Profile updated successfully.",
+            "first_name": request.user.first_name,
+            "last_name": request.user.last_name,
+            "email": request.user.email,
+            "phone": profile.phone,
+            "country": profile.country,
+            "address": profile.address,
+        }
+    )
 
 
 
