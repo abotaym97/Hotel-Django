@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 import uuid
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 #Hotel
@@ -51,6 +52,25 @@ class RoomType(models.Model):
 
     # Extra Bed
     extra_bed_info = models.TextField(blank=True)
+
+    area_m2 = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Room area (m²)",
+    )
+    bed_type = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="Bed type",
+    )
+    view_type = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="Room view",
+    )
+
 
     def __str__(self):
         return self.name
@@ -230,10 +250,25 @@ class NearbyPlace(models.Model):
     description = models.TextField(blank=True)
     image = models.ImageField(upload_to='nearby_places/')
     location = models.CharField(max_length=255)
+    latitude = models.DecimalField(max_digits=25,decimal_places=7,null=True,blank=True,validators=[MinValueValidator(-90), MaxValueValidator(90)],)
+    longitude = models.DecimalField(max_digits=25,decimal_places=7,null=True,blank=True,validators=[MinValueValidator(-180), MaxValueValidator(180)],)
     distance = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
+    ICON_CHOICES = [
+        ("place", "مكان عام"),
+        ("religious", "مكان مقدس"),
+        ("airport", "مطار"),
+        ("restaurant", "مطعم"),
+        ("cafe", "مقهى"),
+        ("shopping", "تسوّق"),
+        ("museum", "متحف أو معلم ثقافي"),
+        ("park", "منتزه"),
+        ("hospital", "مستشفى"),
+        ("transport", "مواصلات"),
+    ]
+    icon_type = models.CharField(max_length=20,choices=ICON_CHOICES,default="place",)
 
     class Meta:
         ordering = ["order" , "id"]
