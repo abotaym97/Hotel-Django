@@ -2964,8 +2964,7 @@ def social_settings(request):
 @permission_classes([AllowAny])
 def zaincash_payment(request, booking_id):
     from django.conf import settings as django_settings
-    from .payment_retry import require_terminal_failure, RetryBlocked
-    from decimal import Decimal
+    from django.core.cache import cache
     from urllib.parse import urlencode
     from .guest_access import can_access_checkout
 
@@ -2976,44 +2975,27 @@ def zaincash_payment(request, booking_id):
             return Response({"error": "Booking access is missing, invalid or expired."}, status=403)
         if booking.booking_status == "cancelled":
             return Response({"error": "This booking has been cancelled"}, status=400)
-        if booking.payment_status == "paid":
-            return Response({"error": "This booking is already paid"}, status=400)
         if booking.expires_at and booking.expires_at <= timezone.now():
             booking.booking_status = "cancelled"
             booking.save(update_fields=["booking_status"])
             return Response({"error": "This booking has expired"}, status=400)
+        if booking.payment_status == "paid":
+            return Response({"error": "This booking is already paid"}, status=400)
         if booking.payment_method != "online":
             return Response({"error": "This booking is not an online-payment booking."}, status=400)
 
-        attempts = list(Payment.objects.select_for_update().filter(
-            booking=booking, gateway="zaincash"
-        ).order_by("created_at", "pk"))
-        # Never reuse a failed/expired redirect URL. Verify every older attempt
-        # before opening a new one; an unknown outcome must not allow a double charge.
-        unused = []
-        for previous in attempts:
-            if previous.status in {"paid", "refunded"}:
-                return Response({"error": "A completed payment exists. Contact the hotel before paying again."}, status=409)
-            if not previous.transaction_id:
-                if previous.status != "pending":
-                    return Response({"error": "A previous payment needs reconciliation. Contact the hotel."}, status=409)
-                unused.append(previous)
-                continue
-            try:
-                require_terminal_failure(previous, booking, inquiry_payment)
-            except RetryBlocked as exc:
-                return Response({"error": str(exc)}, status=409)
-            if previous.status != "failed":
-                previous.status = "failed"
-                previous.save(update_fields=["status"])
-        if len(unused) > 1:
-            return Response({"error": "Multiple uninitialized payments exist. Contact the hotel."}, status=409)
-        payment = unused[0] if unused else Payment.objects.create(
-            booking=booking, gateway="zaincash", amount=booking.total_price,
-            currency="IQD", status="pending"
-        )
-        if Decimal(str(payment.amount)) != Decimal(str(booking.total_price)):
-            return Response({"error": "The booking amount has changed. Contact the hotel."}, status=409)
+        payment = Payment.objects.select_for_update().filter(
+            booking=booking, status="pending"
+        ).order_by("-created_at").first()
+        if not payment:
+            return Response({"error": "Pending payment not found"}, status=400)
+
+        cache_key = f"checkout-redirect:{payment.pk}"
+        cached = cache.get(cache_key)
+        if payment.transaction_id:
+            if cached and cached.get("transaction_id") == str(payment.transaction_id):
+                return Response({"success": True, "redirect_url": cached["url"], "booking_id": booking.id})
+            return Response({"error": "A payment session already exists. Please contact the hotel before starting another payment."}, status=409)
 
         signer = TimestampSigner()
         payment_access_token = signer.sign_object({"booking_id": booking.id, "payment_id": payment.id})
@@ -3042,6 +3024,7 @@ def zaincash_payment(request, booking_id):
             payment.external_reference = details.get("externalReferenceId") or payment.external_reference
             payment.gateway = "zaincash"
             payment.save(update_fields=["transaction_id", "external_reference", "gateway"])
+            cache.set(cache_key, {"transaction_id": str(transaction_id), "url": redirect_url}, timeout=15 * 60)
             return Response({"success": True, "redirect_url": redirect_url, "transaction_id": transaction_id, "external_reference": payment.external_reference, "booking_id": booking.id})
         except Exception:
             return Response({"error": "Unable to confirm payment initialization. Please contact the hotel before trying again."}, status=502)
