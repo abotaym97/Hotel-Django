@@ -29,7 +29,8 @@ DEBUG = os.getenv("DEBUG" , "True") == "True"
 ALLOWED_HOSTS = ["localhost",
                 "127.0.0.1",
                 ".onrender.com",
-                "mustafanaji.pythonanywhere.com"
+                "mustafanaji.pythonanywhere.com",
+                "10.10.150.27"
                 ]
 
 
@@ -184,3 +185,9 @@ ZAINCASH_CLIENT_SECRET = "bibLCGTxVAig5To3OLLKPJQMlRR7Pefp"
 ZAINCASH_API_SECRET = os.getenv(
     "ZAINCASH_API_SECRET"
 )
+
+
+
+
+
+FRONTEND_URL = "http://10.10.150.27:3000"

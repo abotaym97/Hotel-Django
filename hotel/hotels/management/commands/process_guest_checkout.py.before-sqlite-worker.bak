@@ -1,0 +1,39 @@
+import time
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+from ...models import Booking, Payment
+from ...guest_booking_email import send_checkout_email, inspect_failure
+
+
+class Command(BaseCommand):
+    help = 'Send guest recovery emails, verify failures, and expire unpaid pending bookings.'
+
+    def add_arguments(self, parser):
+        parser.add_argument('--loop', action='store_true', help='Keep running; leave this process active.')
+        parser.add_argument('--interval', type=int, default=60)
+
+    def handle(self, *args, **options):
+        interval = max(30, options['interval'])
+        while True:
+            # Pending expired reservations no longer block dates in the existing serializer.
+            # Do not turn a room ON: it could have been closed manually or for another booking.
+            paid_bookings = Payment.objects.filter(status__in=['paid', 'refunded']).values('booking_id')
+            expired = Booking.objects.filter(payment_method='online', booking_status='pending',
+                expires_at__lte=timezone.now()).exclude(payment_status__in=['paid','refunded']).exclude(pk__in=paid_bookings)
+            count = expired.update(booking_status='cancelled')
+            ids = Booking.objects.filter(user__isnull=True, payment_method='online', booking_status='pending',
+                expires_at__gt=timezone.now()).exclude(payment_status__in=['paid','refunded']).values_list('pk', flat=True)
+            initial = failure = 0
+            for booking_id in ids.iterator():
+                initial += int(send_checkout_email(booking_id))
+                try:
+                    failure += int(inspect_failure(booking_id))
+                except Exception:
+                    self.stderr.write(f'Booking {booking_id}: check deferred; will retry next cycle.')
+            self.stdout.write(f'Initial emails: {initial}; failure emails: {failure}; expired bookings: {count}')
+            if not options['loop']:
+                return
+            try:
+                time.sleep(interval)
+            except KeyboardInterrupt:
+                return

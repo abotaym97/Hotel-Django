@@ -1,4 +1,3 @@
-from .payment_diagnostics import audit_verification
 from .guest_access import issue_guest_access
 from urllib import request
 
@@ -4962,7 +4961,6 @@ def public_payment_booking(request, booking_id):
 
 
 
-@audit_verification
 @api_view(["GET"])
 @permission_classes([AllowAny])
 @throttle_classes([AnonRateThrottle])

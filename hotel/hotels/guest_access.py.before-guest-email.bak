@@ -1,5 +1,4 @@
 from django.core import signing
-import hashlib
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -14,11 +13,7 @@ MAX_AGE = 24 * 60 * 60
 def issue_guest_access(booking):
     if booking.user_id is not None:
         return None
-    if booking.expires_at is None or booking.expires_at <= timezone.now():
-        return None
-    return signing.dumps({"booking_id": booking.pk, "scope": "guest-checkout",
-                          "deadline": booking.expires_at.isoformat(),
-                          "recipient": hashlib.sha256(booking.guest_email.strip().lower().encode()).hexdigest()}, salt=SALT)
+    return signing.dumps({"booking_id": booking.pk, "scope": "guest-checkout"}, salt=SALT)
 
 
 def can_access_checkout(request, booking):
@@ -27,8 +22,6 @@ def can_access_checkout(request, booking):
         return True
     # A guest capability must never grant access to an account-owned booking.
     if booking.user_id is not None:
-        return False
-    if booking.expires_at is None or booking.expires_at <= timezone.now():
         return False
     token = request.query_params.get("access_token") or request.data.get("access_token")
     if not isinstance(token, str) or not token:
@@ -41,8 +34,6 @@ def can_access_checkout(request, booking):
         isinstance(payload, dict)
         and payload.get("scope") == "guest-checkout"
         and str(payload.get("booking_id")) == str(booking.pk)
-        and ("deadline" not in payload or payload["deadline"] == booking.expires_at.isoformat())
-        and ("recipient" not in payload or payload["recipient"] == hashlib.sha256(booking.guest_email.strip().lower().encode()).hexdigest())
     )
 
 
